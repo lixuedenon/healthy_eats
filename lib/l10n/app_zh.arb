@@ -1,0 +1,119 @@
+{
+  "@@locale": "zh",
+  "appName": "健康饮食",
+  "@appName": {
+    "description": "应用名称"
+  },
+  "homeTab": "首页",
+  "@homeTab": {
+    "description": "底部导航-首页"
+  },
+  "statisticsTab": "统计",
+  "@statisticsTab": {
+    "description": "底部导航-统计"
+  },
+  "settingsTab": "设置",
+  "@settingsTab": {
+    "description": "底部导航-设置"
+  },
+  "profileTab": "我的",
+  "@profileTab": {
+    "description": "底部导航-个人"
+  },
+  "todayMeals": "今日餐食",
+  "@todayMeals": {
+    "description": "今日餐食标题"
+  },
+  "addMeal": "添加餐食",
+  "@addMeal": {
+    "description": "添加餐食按钮"
+  },
+  "breakfast": "早餐",
+  "@breakfast": {
+    "description": "早餐"
+  },
+  "lunch": "午餐",
+  "@lunch": {
+    "description": "午餐"
+  },
+  "dinner": "晚餐",
+  "@dinner": {
+    "description": "晚餐"
+  },
+  "snack": "零食",
+  "@snack": {
+    "description": "零食"
+  },
+  "calories": "热量",
+  "@calories": {
+    "description": "热量"
+  },
+  "protein": "蛋白质",
+  "@protein": {
+    "description": "蛋白质"
+  },
+  "carbs": "碳水化合物",
+  "@carbs": {
+    "description": "碳水化合物"
+  },
+  "fat": "脂肪",
+  "@fat": {
+    "description": "脂肪"
+  },
+  "emotionROI": "情绪ROI",
+  "@emotionROI": {
+    "description": "情绪ROI"
+  },
+  "lqi": "生活质量指数",
+  "@lqi": {
+    "description": "生活质量指数"
+  },
+  "excellent": "优秀",
+  "@excellent": {
+    "description": "评级-优秀"
+  },
+  "good": "良好",
+  "@good": {
+    "description": "评级-良好"
+  },
+  "average": "一般",
+  "@average": {
+    "description": "评级-一般"
+  },
+  "needsImprovement": "需改善",
+  "@needsImprovement": {
+    "description": "评级-需改善"
+  },
+  "save": "保存",
+  "@save": {
+    "description": "保存按钮"
+  },
+  "cancel": "取消",
+  "@cancel": {
+    "description": "取消按钮"
+  },
+  "delete": "删除",
+  "@delete": {
+    "description": "删除按钮"
+  },
+  "edit": "编辑",
+  "@edit": {
+    "description": "编辑按钮"
+  },
+  "confirm": "确认",
+  "@confirm": {
+    "description": "确认按钮"
+  },
+  "loading": "加载中...",
+  "@loading": {
+    "description": "加载提示"
+  },
+  "error": "错误",
+  "@error": {
+    "description": "错误提示"
+  },
+  "success": "成功",
+  "@success": {
+    "description": "成功提示"
+  }
+}

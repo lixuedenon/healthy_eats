@@ -224,7 +224,14 @@ class MealCard extends StatelessWidget {
   Widget _buildEmotionROI() {
     if (meal.emotionROI == null) return const SizedBox();
 
-    final roi = meal.emotionROI!;
+    // 获取情绪ROI分数（int类型）
+    final score = meal.emotionROI!;
+
+    // 获取评级
+    final rating = _getEmotionROIRating(score);
+
+    // 获取主要益处（如果有的话）
+    final benefit = meal.emotionBenefit ?? '情绪调节';
 
     return Container(
       padding: const EdgeInsets.all(12),
@@ -251,7 +258,7 @@ class MealCard extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      '${roi.totalScore}分',
+                      '$score分',
                       style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.bold,
@@ -269,7 +276,7 @@ class MealCard extends StatelessWidget {
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(
-                        roi.rating,
+                        rating,
                         style: const TextStyle(
                           fontSize: 10,
                           color: Colors.white,
@@ -281,7 +288,7 @@ class MealCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '主要益处: ${roi.primaryBenefit}',
+                  '主要益处: $benefit',
                   style: const TextStyle(
                     fontSize: 11,
                     color: Colors.black54,
@@ -365,5 +372,14 @@ class MealCard extends StatelessWidget {
       default:
         return ThemeConfig.primaryColor;
     }
+  }
+
+  /// 根据分数获取情绪ROI评级
+  String _getEmotionROIRating(int score) {
+    if (score >= 90) return '优秀';
+    if (score >= 80) return '良好';
+    if (score >= 70) return '一般';
+    if (score >= 60) return '较差';
+    return '需改善';
   }
 }

@@ -1,3 +1,6 @@
+// android/app/build.gradle.kts
+// Kotlin DSL Gradle 构建文件
+
 plugins {
     id("com.android.application")
     id("kotlin-android")
@@ -11,12 +14,16 @@ android {
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
+        // 启用 Core Library Desugaring（用于支持 Java 8+ API）
+        isCoreLibraryDesugaringEnabled = true
+        // 使用 Java 1.8 以兼容 flutter_local_notifications
+        sourceCompatibility = JavaVersion.VERSION_1_8
+        targetCompatibility = JavaVersion.VERSION_1_8
     }
 
     kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_11.toString()
+        // Kotlin 编译目标设置为 Java 1.8
+        jvmTarget = "1.8"
     }
 
     defaultConfig {
@@ -41,4 +48,9 @@ android {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    // Core Library Desugaring - 支持 Java 8+ 时间 API
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
 }

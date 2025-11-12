@@ -42,6 +42,9 @@ class AppConfig {
     defaultValue: 'gpt-4',
   );
 
+  /// API请求超时时间（秒）
+  static const int API_TIMEOUT_SECONDS = 30;
+
   // ==================== 天气API配置 ====================
 
   /// 天气API基础URL

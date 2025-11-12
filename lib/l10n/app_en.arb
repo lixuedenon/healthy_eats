@@ -1,0 +1,119 @@
+{
+  "@@locale": "en",
+  "appName": "Healthy Eats",
+  "@appName": {
+    "description": "Application name"
+  },
+  "homeTab": "Home",
+  "@homeTab": {
+    "description": "Bottom navigation-Home"
+  },
+  "statisticsTab": "Stats",
+  "@statisticsTab": {
+    "description": "Bottom navigation-Statistics"
+  },
+  "settingsTab": "Settings",
+  "@settingsTab": {
+    "description": "Bottom navigation-Settings"
+  },
+  "profileTab": "Profile",
+  "@profileTab": {
+    "description": "Bottom navigation-Profile"
+  },
+  "todayMeals": "Today's Meals",
+  "@todayMeals": {
+    "description": "Today's meals title"
+  },
+  "addMeal": "Add Meal",
+  "@addMeal": {
+    "description": "Add meal button"
+  },
+  "breakfast": "Breakfast",
+  "@breakfast": {
+    "description": "Breakfast"
+  },
+  "lunch": "Lunch",
+  "@lunch": {
+    "description": "Lunch"
+  },
+  "dinner": "Dinner",
+  "@dinner": {
+    "description": "Dinner"
+  },
+  "snack": "Snack",
+  "@snack": {
+    "description": "Snack"
+  },
+  "calories": "Calories",
+  "@calories": {
+    "description": "Calories"
+  },
+  "protein": "Protein",
+  "@protein": {
+    "description": "Protein"
+  },
+  "carbs": "Carbs",
+  "@carbs": {
+    "description": "Carbohydrates"
+  },
+  "fat": "Fat",
+  "@fat": {
+    "description": "Fat"
+  },
+  "emotionROI": "Emotion ROI",
+  "@emotionROI": {
+    "description": "Emotion ROI"
+  },
+  "lqi": "Life Quality Index",
+  "@lqi": {
+    "description": "Life Quality Index"
+  },
+  "excellent": "Excellent",
+  "@excellent": {
+    "description": "Rating-Excellent"
+  },
+  "good": "Good",
+  "@good": {
+    "description": "Rating-Good"
+  },
+  "average": "Average",
+  "@average": {
+    "description": "Rating-Average"
+  },
+  "needsImprovement": "Needs Improvement",
+  "@needsImprovement": {
+    "description": "Rating-Needs Improvement"
+  },
+  "save": "Save",
+  "@save": {
+    "description": "Save button"
+  },
+  "cancel": "Cancel",
+  "@cancel": {
+    "description": "Cancel button"
+  },
+  "delete": "Delete",
+  "@delete": {
+    "description": "Delete button"
+  },
+  "edit": "Edit",
+  "@edit": {
+    "description": "Edit button"
+  },
+  "confirm": "Confirm",
+  "@confirm": {
+    "description": "Confirm button"
+  },
+  "loading": "Loading...",
+  "@loading": {
+    "description": "Loading message"
+  },
+  "error": "Error",
+  "@error": {
+    "description": "Error message"
+  },
+  "success": "Success",
+  "@success": {
+    "description": "Success message"
+  }
+}

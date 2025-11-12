@@ -85,13 +85,14 @@ class ThemeConfig {
         ),
       ),
 
-      // 卡片主题
-      cardTheme: CardTheme(
+      // 卡片主题 - Material 3 兼容版本
+      cardTheme: const CardThemeData(
         elevation: 2,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.all(Radius.circular(20)),
         ),
-        color: cardBackgroundColor,
+        // 注意：Material 3 中移除了 color 参数
+        // 卡片颜色由 ColorScheme.surface 控制
       ),
 
       // 输入框主题
@@ -247,12 +248,14 @@ class ThemeConfig {
         foregroundColor: Colors.white,
       ),
 
-      cardTheme: CardTheme(
+      // 暗色主题的卡片配置 - Material 3 兼容版本
+      cardTheme: const CardThemeData(
         elevation: 2,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.all(Radius.circular(20)),
         ),
-        color: const Color(0xFF1E1E1E),
+        // 注意：Material 3 中移除了 color 参数
+        // 卡片颜色由 ColorScheme.surface 控制
       ),
     );
   }
