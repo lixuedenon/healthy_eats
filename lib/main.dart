@@ -1,357 +1,520 @@
-// lib/domain/ai_engine/calculators/nutrition_calculator.dart
-// Dart类文件
+// lib/main.dart
+// 应用入口文件
 
-import '../../../data/models/nutrition_model.dart';
-import '../../../data/models/food_item_model.dart';
-import '../../../data/models/meal_model.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:provider/provider.dart';
 
-/// 营养计算器
-///
-/// 用于计算食物、餐食的营养成分
-class NutritionCalculator {
-  // ==================== 基础计算 ====================
+// 导入本地生成的国际化文件
+import 'l10n/app_localizations.dart';
 
-  /// 计算单个餐食的总营养成分
-  static Nutrition calculateMealNutrition(Meal meal) {
-    if (meal.foodItems.isEmpty) {
-      return Nutrition.empty;
-    }
+// 导入配置
+import 'config/theme_config.dart';
 
-    // 累加所有食物项的营养成分
-    Nutrition total = meal.foodItems.first.nutrition;
+// 导入服务
+import 'core/services/storage_service.dart';
+import 'core/services/notification_service.dart';
 
-    for (int i = 1; i < meal.foodItems.length; i++) {
-      total = total + meal.foodItems[i].nutrition;
-    }
+// 导入 Repository
+import 'data/repositories/user_repository.dart';
+import 'data/repositories/meal_repository.dart';
 
-    return total;
-  }
+// 导入 ViewModel
+import 'presentation/viewmodels/user_viewmodel.dart';
+import 'presentation/viewmodels/home_viewmodel.dart';
 
-  /// 计算多个餐食的总营养成分
-  static Nutrition calculateDailyNutrition(List<Meal> meals) {
-    if (meals.isEmpty) {
-      return Nutrition.empty;
-    }
+void main() async {
+  // 确保Flutter绑定初始化
+  WidgetsFlutterBinding.ensureInitialized();
 
-    Nutrition total = Nutrition.empty;
+  // 设置系统UI样式
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.dark,
+    ),
+  );
 
-    for (Meal meal in meals) {
-      total = total + meal.nutrition;
-    }
+  // 初始化本地存储服务
+  final storageService = await StorageService.getInstance();
 
-    return total;
-  }
+  // 初始化通知服务
+  await NotificationService.initialize();
 
-  /// 计算食物列表的总营养成分
-  static Nutrition calculateFoodListNutrition(List<FoodItem> foodItems) {
-    if (foodItems.isEmpty) {
-      return Nutrition.empty;
-    }
+  // 初始化 Repository
+  final userRepository = UserRepository(storageService);
+  final mealRepository = MealRepository(storageService);
 
-    Nutrition total = foodItems.first.nutrition;
+  // 运行应用
+  runApp(
+    HealthyEatsApp(
+      userRepository: userRepository,
+      mealRepository: mealRepository,
+    ),
+  );
+}
 
-    for (int i = 1; i < foodItems.length; i++) {
-      total = total + foodItems[i].nutrition;
-    }
+class HealthyEatsApp extends StatelessWidget {
+  final UserRepository userRepository;
+  final MealRepository mealRepository;
 
-    return total;
-  }
+  const HealthyEatsApp({
+    super.key,
+    required this.userRepository,
+    required this.mealRepository,
+  });
 
-  // ==================== 营养达标判断 ====================
+  @override
+  Widget build(BuildContext context) {
+    return MultiProvider(
+      providers: [
+        // 用户ViewModel - 移除 ..initialize()
+        ChangeNotifierProvider(
+          create: (_) => UserViewModel(userRepository),
+        ),
+        // 首页ViewModel - 移除 ..initialize()
+        ChangeNotifierProvider(
+          create: (_) => HomeViewModel(userRepository, mealRepository),
+        ),
+      ],
+      child: Consumer<UserViewModel>(
+        builder: (context, userViewModel, child) {
+          return MaterialApp(
+            title: 'Healthy Eats',
 
-  /// 判断营养摄入是否达标
-  ///
-  /// 返回：{
-  ///   'calories': {'actual': 1800, 'target': 2000, 'percentage': 90, 'isAdequate': true},
-  ///   'protein': {...},
-  ///   ...
-  /// }
-  static Map<String, Map<String, dynamic>> checkNutritionAdequacy({
-    required Nutrition actual,
-    required int targetCalories,
-    required int targetProtein,
-    required int targetCarbs,
-    required int targetFat,
-  }) {
-    return {
-      'calories': _checkNutrient(
-        actual: actual.calories,
-        target: targetCalories.toDouble(),
-        unit: 'kcal',
+            // 主题配置
+            theme: ThemeConfig.lightTheme,
+            darkTheme: ThemeConfig.darkTheme,
+            themeMode: ThemeMode.system,
+
+            // 国际化配置
+            localizationsDelegates: const [
+              AppLocalizations.delegate,
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            supportedLocales: const [
+              Locale('zh'), // 中文
+              Locale('en'), // 英文
+              Locale('ja'), // 日文
+              Locale('ko'), // 韩文
+              Locale('fr'), // 法文
+              Locale('de'), // 德文
+              Locale('es'), // 西班牙文
+            ],
+            locale: Locale(userViewModel.currentUser?.language ?? 'zh'),
+
+            // 启动页
+            home: const AppInitializerPage(),
+
+            // 关闭调试横幅
+            debugShowCheckedModeBanner: false,
+          );
+        },
       ),
-      'protein': _checkNutrient(
-        actual: actual.protein,
-        target: targetProtein.toDouble(),
-        unit: 'g',
-      ),
-      'carbs': _checkNutrient(
-        actual: actual.carbs,
-        target: targetCarbs.toDouble(),
-        unit: 'g',
-      ),
-      'fat': _checkNutrient(
-        actual: actual.fat,
-        target: targetFat.toDouble(),
-        unit: 'g',
-      ),
-    };
-  }
-
-  /// 检查单个营养素
-  static Map<String, dynamic> _checkNutrient({
-    required double actual,
-    required double target,
-    required String unit,
-  }) {
-    double percentage = (actual / target) * 100;
-    bool isAdequate = percentage >= 80 && percentage <= 120; // 80%-120%为合理范围
-    bool isExcessive = percentage > 120;
-    bool isInsufficient = percentage < 80;
-
-    String status = 'adequate';
-    if (isExcessive) {
-      status = 'excessive';
-    } else if (isInsufficient) {
-      status = 'insufficient';
-    }
-
-    return {
-      'actual': actual,
-      'target': target,
-      'percentage': percentage.round(),
-      'unit': unit,
-      'isAdequate': isAdequate,
-      'isExcessive': isExcessive,
-      'isInsufficient': isInsufficient,
-      'status': status,
-      'gap': target - actual,
-    };
-  }
-
-  // ==================== 微量营养素分析 ====================
-
-  /// 分析微量营养素含量
-  static Map<String, String> analyzeMicronutrients(Nutrition nutrition) {
-    Map<String, String> analysis = {};
-
-    // 镁
-    if (nutrition.magnesium != null) {
-      if (nutrition.magnesium! >= 320) {
-        analysis['镁'] = '充足 ↑';
-      } else if (nutrition.magnesium! >= 200) {
-        analysis['镁'] = '适量 ✓';
-      } else {
-        analysis['镁'] = '不足 ↓';
-      }
-    }
-
-    // B族维生素（这里简化处理，实际应该分别计算B6、B12等）
-    if (nutrition.vitaminB6 != null || nutrition.vitaminB12 != null) {
-      analysis['B族维生素'] = '充足 ↑';
-    }
-
-    // 色氨酸
-    if (nutrition.tryptophan != null) {
-      if (nutrition.tryptophan! >= 200) {
-        analysis['色氨酸'] = '充足 ↑';
-      } else if (nutrition.tryptophan! >= 100) {
-        analysis['色氨酸'] = '适量 ✓';
-      } else {
-        analysis['色氨酸'] = '不足 ↓';
-      }
-    }
-
-    // Omega-3
-    if (nutrition.omega3 != null) {
-      if (nutrition.omega3! >= 1.5) {
-        analysis['Omega-3'] = '充足 ↑';
-      } else if (nutrition.omega3! >= 1.0) {
-        analysis['Omega-3'] = '适量 ✓';
-      } else {
-        analysis['Omega-3'] = '不足 ↓';
-      }
-    }
-
-    // 维生素C
-    if (nutrition.vitaminC != null) {
-      if (nutrition.vitaminC! >= 80) {
-        analysis['维生素C'] = '充足 ↑';
-      } else if (nutrition.vitaminC! >= 50) {
-        analysis['维生素C'] = '适量 ✓';
-      } else {
-        analysis['维生素C'] = '不足 ↓';
-      }
-    }
-
-    // 铁
-    if (nutrition.iron != null) {
-      if (nutrition.iron! >= 15) {
-        analysis['铁'] = '充足 ↑';
-      } else if (nutrition.iron! >= 10) {
-        analysis['铁'] = '适量 ✓';
-      } else {
-        analysis['铁'] = '不足 ↓';
-      }
-    }
-
-    // 膳食纤维
-    if (nutrition.fiber != null) {
-      if (nutrition.fiber! >= 25) {
-        analysis['膳食纤维'] = '充足 ↑';
-      } else if (nutrition.fiber! >= 15) {
-        analysis['膳食纤维'] = '适量 ✓';
-      } else {
-        analysis['膳食纤维'] = '不足 ↓';
-      }
-    }
-
-    return analysis;
-  }
-
-  // ==================== 营养平衡分析 ====================
-
-  /// 分析三大营养素比例是否合理
-  ///
-  /// 理想比例：蛋白质 15-20%, 碳水 50-60%, 脂肪 25-30%
-  static Map<String, dynamic> analyzeNutrientBalance(Nutrition nutrition) {
-    double proteinPercent = nutrition.proteinPercentage;
-    double carbsPercent = nutrition.carbsPercentage;
-    double fatPercent = nutrition.fatPercentage;
-
-    bool isProteinBalanced = proteinPercent >= 15 && proteinPercent <= 25;
-    bool isCarbsBalanced = carbsPercent >= 45 && carbsPercent <= 65;
-    bool isFatBalanced = fatPercent >= 20 && fatPercent <= 35;
-
-    bool isBalanced = isProteinBalanced && isCarbsBalanced && isFatBalanced;
-
-    List<String> suggestions = [];
-
-    if (!isProteinBalanced) {
-      if (proteinPercent < 15) {
-        suggestions.add('蛋白质比例偏低，建议增加优质蛋白摄入');
-      } else {
-        suggestions.add('蛋白质比例偏高，可适当减少');
-      }
-    }
-
-    if (!isCarbsBalanced) {
-      if (carbsPercent < 45) {
-        suggestions.add('碳水化合物比例偏低，建议适当增加主食');
-      } else {
-        suggestions.add('碳水化合物比例偏高，建议减少主食摄入');
-      }
-    }
-
-    if (!isFatBalanced) {
-      if (fatPercent < 20) {
-        suggestions.add('脂肪比例偏低，建议适当增加健康脂肪');
-      } else {
-        suggestions.add('脂肪比例偏高，建议减少油脂摄入');
-      }
-    }
-
-    return {
-      'isBalanced': isBalanced,
-      'proteinPercent': proteinPercent.round(),
-      'carbsPercent': carbsPercent.round(),
-      'fatPercent': fatPercent.round(),
-      'isProteinBalanced': isProteinBalanced,
-      'isCarbsBalanced': isCarbsBalanced,
-      'isFatBalanced': isFatBalanced,
-      'suggestions': suggestions,
-    };
-  }
-
-  // ==================== 营养评分 ====================
-
-  /// 计算营养评分（0-100）
-  static int calculateNutritionScore({
-    required Nutrition actual,
-    required int targetCalories,
-    required int targetProtein,
-    required int targetCarbs,
-    required int targetFat,
-  }) {
-    int score = 100;
-
-    // 热量偏差扣分
-    double caloriesDiff = (actual.calories - targetCalories).abs();
-    double caloriesDeviation = caloriesDiff / targetCalories;
-    if (caloriesDeviation > 0.2) score -= 20; // 偏差>20%扣20分
-    else if (caloriesDeviation > 0.1) score -= 10; // 偏差>10%扣10分
-
-    // 蛋白质偏差扣分
-    double proteinDiff = (actual.protein - targetProtein).abs();
-    double proteinDeviation = proteinDiff / targetProtein;
-    if (proteinDeviation > 0.2) score -= 15;
-    else if (proteinDeviation > 0.1) score -= 8;
-
-    // 碳水偏差扣分
-    double carbsDiff = (actual.carbs - targetCarbs).abs();
-    double carbsDeviation = carbsDiff / targetCarbs;
-    if (carbsDeviation > 0.2) score -= 15;
-    else if (carbsDeviation > 0.1) score -= 8;
-
-    // 脂肪偏差扣分
-    double fatDiff = (actual.fat - targetFat).abs();
-    double fatDeviation = fatDiff / targetFat;
-    if (fatDeviation > 0.2) score -= 15;
-    else if (fatDeviation > 0.1) score -= 8;
-
-    // 营养平衡加分
-    final balance = analyzeNutrientBalance(actual);
-    if (balance['isBalanced']) {
-      score += 10; // 平衡良好加10分
-    }
-
-    // 微量营养素加分
-    final microAnalysis = analyzeMicronutrients(actual);
-    int sufficientCount = microAnalysis.values.where((v) => v.contains('充足')).length;
-    score += sufficientCount * 2; // 每个充足的微量营养素加2分
-
-    // 确保分数在0-100之间
-    return score.clamp(0, 100);
-  }
-
-  // ==================== 工具方法 ====================
-
-  /// 格式化营养成分显示
-  static String formatNutritionDisplay(Nutrition nutrition) {
-    return '热量: ${nutrition.calories.toStringAsFixed(0)} kcal\n'
-           '蛋白质: ${nutrition.protein.toStringAsFixed(1)} g\n'
-           '碳水: ${nutrition.carbs.toStringAsFixed(1)} g\n'
-           '脂肪: ${nutrition.fat.toStringAsFixed(1)} g';
-  }
-
-  /// 生成营养摘要
-  static String generateNutritionSummary({
-    required Nutrition actual,
-    required int targetCalories,
-    required int targetProtein,
-  }) {
-    final adequacy = checkNutritionAdequacy(
-      actual: actual,
-      targetCalories: targetCalories,
-      targetProtein: targetProtein,
-      targetCarbs: 250,
-      targetFat: 70,
     );
+  }
+}
 
-    final caloriesStatus = adequacy['calories']!['status'];
-    final proteinStatus = adequacy['protein']!['status'];
+/// 应用初始化页面
+///
+/// 负责在后台初始化 ViewModel，完成后跳转到主页
+class AppInitializerPage extends StatefulWidget {
+  const AppInitializerPage({super.key});
 
-    String summary = '';
+  @override
+  State<AppInitializerPage> createState() => _AppInitializerPageState();
+}
 
-    if (caloriesStatus == 'adequate' && proteinStatus == 'adequate') {
-      summary = '营养摄入均衡，符合您的目标！';
-    } else if (caloriesStatus == 'insufficient') {
-      summary = '热量摄入不足，建议适当增加食物摄入。';
-    } else if (caloriesStatus == 'excessive') {
-      summary = '热量摄入超标，建议控制食物份量。';
-    } else if (proteinStatus == 'insufficient') {
-      summary = '蛋白质摄入不足，建议增加优质蛋白食物。';
+class _AppInitializerPageState extends State<AppInitializerPage> {
+  bool _isInitialized = false;
+  String _statusMessage = '正在初始化...';
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeApp();
+  }
+
+  Future<void> _initializeApp() async {
+    try {
+      setState(() {
+        _statusMessage = '加载用户信息...';
+      });
+
+      // 获取 ViewModel
+      final userViewModel = context.read<UserViewModel>();
+      final homeViewModel = context.read<HomeViewModel>();
+
+      // 初始化用户信息
+      await userViewModel.initialize();
+
+      setState(() {
+        _statusMessage = '加载餐食数据...';
+      });
+
+      // 初始化首页数据
+      await homeViewModel.initialize();
+
+      setState(() {
+        _statusMessage = '初始化完成！';
+        _isInitialized = true;
+      });
+
+      // 延迟一下让用户看到"完成"消息
+      await Future.delayed(const Duration(milliseconds: 500));
+
+      // 跳转到主页（这里先用临时页面）
+      if (mounted) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (context) => const TemporaryHomePage(),
+          ),
+        );
+      }
+    } catch (e) {
+      setState(() {
+        _statusMessage = '初始化失败: $e';
+      });
+      print('App initialization failed: $e');
     }
+  }
 
-    return summary;
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: ThemeConfig.backgroundColor,
+      body: SafeArea(
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // 应用图标
+                Container(
+                  width: 120,
+                  height: 120,
+                  decoration: BoxDecoration(
+                    color: ThemeConfig.primaryColor,
+                    borderRadius: BorderRadius.circular(30),
+                    boxShadow: ThemeConfig.cardShadow,
+                  ),
+                  child: const Icon(
+                    Icons.restaurant_menu,
+                    size: 60,
+                    color: Colors.white,
+                  ),
+                ),
+
+                const SizedBox(height: 48),
+
+                // 加载指示器
+                if (!_isInitialized) ...[
+                  const CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      ThemeConfig.primaryColor,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                ] else ...[
+                  Icon(
+                    Icons.check_circle,
+                    size: 48,
+                    color: ThemeConfig.primaryColor,
+                  ),
+                  const SizedBox(height: 24),
+                ],
+
+                // 状态消息
+                Text(
+                  _statusMessage,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: ThemeConfig.textSecondaryColor,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 临时首页
+///
+/// 这是一个占位页面，用于验证应用可以正常启动
+/// 后续需要替换为真正的 HomeScreen
+class TemporaryHomePage extends StatelessWidget {
+  const TemporaryHomePage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+
+    return Scaffold(
+      backgroundColor: ThemeConfig.backgroundColor,
+      appBar: AppBar(
+        title: Text(l10n.appName),
+        centerTitle: true,
+        elevation: 0,
+        backgroundColor: Colors.transparent,
+      ),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            children: [
+              const SizedBox(height: 20),
+
+              // 应用图标
+              Container(
+                width: 120,
+                height: 120,
+                decoration: BoxDecoration(
+                  color: ThemeConfig.primaryColor,
+                  borderRadius: BorderRadius.circular(30),
+                  boxShadow: ThemeConfig.cardShadow,
+                ),
+                child: const Icon(
+                  Icons.restaurant_menu,
+                  size: 60,
+                  color: Colors.white,
+                ),
+              ),
+
+              const SizedBox(height: 32),
+
+              // 应用名称
+              Text(
+                l10n.appName,
+                style: Theme.of(context).textTheme.displayMedium?.copyWith(
+                  color: ThemeConfig.primaryColor,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+
+              const SizedBox(height: 16),
+
+              // 副标题
+              Text(
+                'AI智能健康饮食管理',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  color: ThemeConfig.textSecondaryColor,
+                ),
+              ),
+
+              const SizedBox(height: 48),
+
+              // 成功提示
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: ThemeConfig.primaryColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: ThemeConfig.primaryColor.withOpacity(0.3),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.check_circle,
+                      color: ThemeConfig.primaryColor,
+                      size: 32,
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Text(
+                        '应用启动成功！\n核心架构已就绪',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: ThemeConfig.primaryColor,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 32),
+
+              // 功能列表
+              _buildFeatureCard(
+                context,
+                icon: Icons.analytics_outlined,
+                title: '情绪ROI分析',
+                description: '基于营养素的情绪调节评估',
+                status: '✓ 已就绪',
+              ),
+
+              const SizedBox(height: 16),
+
+              _buildFeatureCard(
+                context,
+                icon: Icons.insights_outlined,
+                title: 'LQI生活质量指数',
+                description: '综合健康、情绪、预算、便捷性',
+                status: '✓ 已就绪',
+              ),
+
+              const SizedBox(height: 16),
+
+              _buildFeatureCard(
+                context,
+                icon: Icons.psychology_outlined,
+                title: 'AI智能推荐',
+                description: '个性化餐食方案生成',
+                status: '待开发',
+              ),
+
+              const SizedBox(height: 32),
+
+              // 下一步提示
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.amber.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: Colors.amber.withOpacity(0.3),
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.info_outline,
+                          color: Colors.amber[700],
+                          size: 24,
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          '下一步开发',
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            color: Colors.amber[700],
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      '• 实现底部导航栏\n'
+                      '• 创建首页布局\n'
+                      '• 添加餐食记录功能\n'
+                      '• 实现AI推荐接口',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: ThemeConfig.textSecondaryColor,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 32),
+
+              // 版本信息
+              Text(
+                'Version 1.0.0 (Build 1)',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: ThemeConfig.textHintColor,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFeatureCard(
+    BuildContext context, {
+    required IconData icon,
+    required String title,
+    required String description,
+    required String status,
+  }) {
+    final bool isReady = status.contains('✓');
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: ThemeConfig.cardShadow,
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: ThemeConfig.primaryColor.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(
+              icon,
+              color: ThemeConfig.primaryColor,
+              size: 24,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        title,
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: isReady
+                          ? Colors.green.withOpacity(0.1)
+                          : Colors.orange.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        status,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: isReady ? Colors.green[700] : Colors.orange[700],
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  description,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: ThemeConfig.textSecondaryColor,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
