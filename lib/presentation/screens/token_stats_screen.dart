@@ -1,6 +1,7 @@
 // lib/presentation/screens/token_stats_screen.dart
 // Dart类文件
 
+import 'dart:convert'; // 新增导入
 import 'package:flutter/material.dart';
 import '../../data/models/token_usage_model.dart';
 import '../../data/repositories/token_stats_repository.dart';
@@ -122,17 +123,10 @@ class _TokenStatsScreenState extends State<TokenStatsScreen>
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        // 概览卡片
         _buildOverviewCard(stats, title),
-
         const SizedBox(height: 16),
-
-        // 模型对比卡片
         _buildModelComparisonCard(stats),
-
         const SizedBox(height: 16),
-
-        // 调用记录
         _buildRecordsSection(),
       ],
     );
@@ -158,8 +152,6 @@ class _TokenStatsScreenState extends State<TokenStatsScreen>
               ),
             ),
             const SizedBox(height: 20),
-
-            // 总成本（突出显示）
             Center(
               child: Column(
                 children: [
@@ -182,10 +174,7 @@ class _TokenStatsScreenState extends State<TokenStatsScreen>
                 ],
               ),
             ),
-
             const SizedBox(height: 24),
-
-            // 其他统计
             _buildStatRow('调用次数', '${stats.totalCalls} 次'),
             const SizedBox(height: 12),
             _buildStatRow(
@@ -222,18 +211,13 @@ class _TokenStatsScreenState extends State<TokenStatsScreen>
               ),
             ),
             const SizedBox(height: 16),
-
-            // GPT-4
             _buildModelRow(
               'GPT-4',
               stats.gpt4Calls,
               stats.gpt4CostDisplay,
               Colors.blue,
             ),
-
             const SizedBox(height: 16),
-
-            // GPT-3.5
             _buildModelRow(
               'GPT-3.5-Turbo',
               stats.gpt35Calls,
@@ -250,7 +234,6 @@ class _TokenStatsScreenState extends State<TokenStatsScreen>
   Widget _buildModelRow(String model, int calls, String cost, Color color) {
     return Row(
       children: [
-        // 图标
         Container(
           width: 40,
           height: 40,
@@ -260,10 +243,7 @@ class _TokenStatsScreenState extends State<TokenStatsScreen>
           ),
           child: Icon(Icons.psychology, color: color, size: 24),
         ),
-
         const SizedBox(width: 16),
-
-        // 信息
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -286,8 +266,6 @@ class _TokenStatsScreenState extends State<TokenStatsScreen>
             ],
           ),
         ),
-
-        // 成本
         Text(
           cost,
           style: TextStyle(
@@ -356,7 +334,6 @@ class _TokenStatsScreenState extends State<TokenStatsScreen>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 标题行
             Row(
               children: [
                 Container(
@@ -397,10 +374,7 @@ class _TokenStatsScreenState extends State<TokenStatsScreen>
                 ),
               ],
             ),
-
             const SizedBox(height: 12),
-
-            // Token信息
             Row(
               children: [
                 _buildTokenInfo('输入', record.inputTokens, Icons.input),

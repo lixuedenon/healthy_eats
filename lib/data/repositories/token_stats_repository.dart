@@ -1,6 +1,7 @@
 // lib/data/repositories/token_stats_repository.dart
 // Dart类文件
 
+import 'dart:convert'; // 新增导入
 import '../models/token_usage_model.dart';
 import '../../core/services/storage_service.dart';
 
@@ -22,7 +23,7 @@ class TokenStatsRepository {
       final recordsJson = records.map((r) => r.toJson()).toList();
       return await _storageService.setString(
         _KEY_TOKEN_RECORDS,
-        recordsJson.toString(),
+        jsonEncode(recordsJson), // 使用jsonEncode
       );
     } catch (e) {
       print('Error saving token usage: $e');
@@ -36,7 +37,6 @@ class TokenStatsRepository {
       final jsonString = _storageService.getString(_KEY_TOKEN_RECORDS);
       if (jsonString == null || jsonString.isEmpty) return [];
 
-      // 解析JSON字符串
       final List<dynamic> jsonList = _parseJsonList(jsonString);
       return jsonList
           .map((json) => TokenUsage.fromJson(json as Map<String, dynamic>))
@@ -130,7 +130,7 @@ class TokenStatsRepository {
       final recordsJson = filteredRecords.map((r) => r.toJson()).toList();
       return await _storageService.setString(
         _KEY_TOKEN_RECORDS,
-        recordsJson.toString(),
+        jsonEncode(recordsJson), // 使用jsonEncode
       );
     } catch (e) {
       print('Error deleting old records: $e');
@@ -142,8 +142,11 @@ class TokenStatsRepository {
 
   /// 解析JSON列表
   List<dynamic> _parseJsonList(String jsonString) {
-    // 简单的JSON解析，实际项目中应使用 dart:convert
-    // 这里假设 StorageService 已经处理了序列化
-    return [];
+    try {
+      return jsonDecode(jsonString) as List<dynamic>;
+    } catch (e) {
+      print('Error parsing JSON list: $e');
+      return [];
+    }
   }
 }

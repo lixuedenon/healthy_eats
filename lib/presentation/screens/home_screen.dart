@@ -6,11 +6,11 @@ import 'package:provider/provider.dart';
 import '../viewmodels/home_viewmodel.dart';
 import '../widgets/meal_card.dart';
 import '../widgets/lqi_card.dart';
+import '../widgets/recommended_meal_card.dart';
 import '../../config/theme_config.dart';
+import 'meal_record_screen.dart';
 
 /// 首页界面
-///
-/// 显示今日餐食、LQI等信息
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
 
@@ -22,7 +22,6 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    // 初始化数据
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<HomeViewModel>().initialize();
     });
@@ -34,10 +33,7 @@ class _HomeScreenState extends State<HomeScreen> {
       backgroundColor: Colors.grey[50],
       body: CustomScrollView(
         slivers: [
-          // AppBar
           _buildAppBar(),
-
-          // 内容
           SliverToBoxAdapter(
             child: Consumer<HomeViewModel>(
               builder: (context, viewModel, child) {
@@ -53,8 +49,15 @@ class _HomeScreenState extends State<HomeScreen> {
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // 用户问候
                     _buildGreeting(viewModel),
+
+                    // 用户信息不完整提示
+                    if (!viewModel.isUserProfileComplete())
+                      _buildProfileIncompleteBanner(viewModel),
+
+                    // AI推荐区域
+                    if (viewModel.currentRecommendations.isNotEmpty)
+                      _buildRecommendationsSection(viewModel),
 
                     // LQI卡片
                     if (viewModel.todayLQI != null)
@@ -70,7 +73,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     // 今日餐食
                     _buildTodayMeals(viewModel),
 
-                    const SizedBox(height: 80), // 底部padding
+                    const SizedBox(height: 80),
                   ],
                 );
               },
@@ -78,12 +81,14 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-
-      // 浮动按钮
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
-          // TODO: 打开添加餐食对话框
-          _showAddMealDialog();
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => const MealRecordScreen(),
+            ),
+          );
         },
         icon: const Icon(Icons.add),
         label: const Text('添加餐食'),
@@ -121,18 +126,15 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
       actions: [
-        // 日历按钮
         IconButton(
           icon: const Icon(Icons.calendar_today),
           onPressed: () {
             _showDatePicker();
           },
         ),
-        // 设置按钮
         IconButton(
           icon: const Icon(Icons.settings),
           onPressed: () {
-            // TODO: 跳转到设置页
             Navigator.pushNamed(context, '/settings');
           },
         ),
@@ -175,6 +177,172 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  /// 构建用户信息不完整提示横幅
+  Widget _buildProfileIncompleteBanner(HomeViewModel viewModel) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.orange[50],
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.orange[200]!),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.info_outline, color: Colors.orange[700]),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '⚠️ 您的个人信息或饮食偏好不完整',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.orange[900],
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '当前推荐基于大众口味，完善信息后可获得更精准的个性化推荐',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.orange[700],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pushNamed(context, '/settings');
+            },
+            child: const Text('去完善'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 构建AI推荐区域
+  Widget _buildRecommendationsSection(HomeViewModel viewModel) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                '📍 今日推荐',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              Row(
+                children: [
+                  // 模型切换按钮
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.grey[200],
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        _buildModelButton(
+                          'GPT-4',
+                          viewModel.selectedModel.contains('gpt-4'),
+                          () => viewModel.switchModel('gpt-4'),
+                        ),
+                        _buildModelButton(
+                          'GPT-3.5',
+                          viewModel.selectedModel.contains('gpt-3.5'),
+                          () => viewModel.switchModel('gpt-3.5-turbo'),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  // 换一套按钮
+                  TextButton.icon(
+                    onPressed: viewModel.isLoadingRecommendations
+                        ? null
+                        : () async {
+                            await viewModel.refreshRecommendations();
+                          },
+                    icon: viewModel.isLoadingRecommendations
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.refresh, size: 18),
+                    label: const Text('换一套'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: ThemeConfig.primaryColor,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+
+        // 推荐餐食卡片
+        if (viewModel.isLoadingRecommendations)
+          const Center(
+            child: Padding(
+              padding: EdgeInsets.all(40),
+              child: CircularProgressIndicator(),
+            ),
+          )
+        else
+          ...viewModel.currentRecommendations.map(
+            (recommendation) => RecommendedMealCard(
+              meal: recommendation,
+              showModelBadge: true,
+              onAdopt: () async {
+                await viewModel.adoptRecommendation(recommendation);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('已采用推荐！')),
+                  );
+                }
+              },
+              onViewDetail: () {
+                // TODO: 查看推荐详情
+              },
+            ),
+          ),
+      ],
+    );
+  }
+
+  /// 构建模型选择按钮
+  Widget _buildModelButton(String label, bool isSelected, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected ? ThemeConfig.primaryColor : Colors.transparent,
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: isSelected ? Colors.white : Colors.black87,
+          ),
+        ),
       ),
     );
   }
@@ -264,8 +432,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ==================== 对话框 ====================
-
   /// 显示日期选择器
   Future<void> _showDatePicker() async {
     final viewModel = context.read<HomeViewModel>();
@@ -281,39 +447,6 @@ class _HomeScreenState extends State<HomeScreen> {
     if (selectedDate != null) {
       await viewModel.selectDate(selectedDate);
     }
-  }
-
-  /// 显示添加餐食对话框
-  void _showAddMealDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('添加餐食'),
-        content: const Text('选择添加方式'),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              // TODO: 打开手动添加页面
-            },
-            child: const Text('手动添加'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              // TODO: 打开AI推荐页面
-            },
-            child: const Text('AI推荐'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-            },
-            child: const Text('取消'),
-          ),
-        ],
-      ),
-    );
   }
 
   /// 显示删除确认对话框
@@ -337,8 +470,6 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
-
-  // ==================== 辅助方法 ====================
 
   /// 获取激励消息
   String _getMotivationalMessage(HomeViewModel viewModel) {
