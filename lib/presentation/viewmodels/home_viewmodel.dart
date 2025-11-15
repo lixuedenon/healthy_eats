@@ -5,9 +5,13 @@ import 'package:flutter/material.dart';
 import '../../data/models/user_model.dart';
 import '../../data/models/meal_model.dart';
 import '../../data/models/lqi_model.dart';
+import '../../data/models/recommended_meal_model.dart';
+import '../../data/models/food_item_model.dart';
 import '../../data/repositories/user_repository.dart';
 import '../../data/repositories/meal_repository.dart';
 import '../../domain/ai_engine/calculators/lqi_calculator.dart';
+import '../../domain/ai_engine/calculators/nutrition_calculator.dart';
+import '../../core/services/ai_recommendation_service.dart';
 
 /// 首页ViewModel
 ///
@@ -15,6 +19,7 @@ import '../../domain/ai_engine/calculators/lqi_calculator.dart';
 class HomeViewModel extends ChangeNotifier {
   final UserRepository _userRepository;
   final MealRepository _mealRepository;
+  AIRecommendationService? _aiService;
 
   HomeViewModel(this._userRepository, this._mealRepository);
 
@@ -38,6 +43,18 @@ class HomeViewModel extends ChangeNotifier {
   DateTime _selectedDate = DateTime.now();
   DateTime get selectedDate => _selectedDate;
 
+  // ==================== 推荐相关状态 ====================
+
+  DualRecommendation? _dualRecommendation;
+  String _selectedModel = 'gpt-4'; // 当前选择的模型
+  String get selectedModel => _selectedModel;
+
+  List<RecommendedMeal> _currentRecommendations = [];
+  List<RecommendedMeal> get currentRecommendations => _currentRecommendations;
+
+  bool _isLoadingRecommendations = false;
+  bool get isLoadingRecommendations => _isLoadingRecommendations;
+
   // ==================== 初始化 ====================
 
   /// 初始化数据
@@ -45,6 +62,11 @@ class HomeViewModel extends ChangeNotifier {
     await _loadUserProfile();
     await _loadTodayMeals();
     await _calculateTodayLQI();
+  }
+
+  /// 设置AI服务
+  void setAIService(AIRecommendationService service) {
+    _aiService = service;
   }
 
   /// 加载用户信息
@@ -94,6 +116,109 @@ class HomeViewModel extends ChangeNotifier {
     } catch (e) {
       _setError('计算LQI失败: $e');
     }
+  }
+
+  // ==================== AI推荐功能 ====================
+
+  /// 加载推荐餐食
+  Future<void> loadRecommendations() async {
+    if (_aiService == null) {
+      _setError('AI服务未初始化');
+      return;
+    }
+
+    try {
+      _isLoadingRecommendations = true;
+      notifyListeners();
+
+      _dualRecommendation = await _aiService!.getDualRecommendations(
+        user: _currentUser,
+      );
+
+      // 默认显示GPT-4的推荐
+      _currentRecommendations = _dualRecommendation!.gpt4Results;
+
+      _isLoadingRecommendations = false;
+      notifyListeners();
+    } catch (e) {
+      _setError('加载推荐失败: $e');
+      _isLoadingRecommendations = false;
+      notifyListeners();
+    }
+  }
+
+  /// 切换模型
+  void switchModel(String model) {
+    if (_dualRecommendation == null) return;
+
+    _selectedModel = model;
+    _currentRecommendations = _dualRecommendation!.getResults(model);
+    notifyListeners();
+  }
+
+  /// 刷新推荐（换一套）
+  Future<void> refreshRecommendations() async {
+    await loadRecommendations();
+  }
+
+  /// 采用推荐
+  Future<bool> adoptRecommendation(RecommendedMeal recommendation) async {
+    try {
+      // 转换为Meal对象
+      final meal = _convertRecommendationToMeal(recommendation);
+
+      // 保存餐食
+      final success = await addMeal(meal);
+
+      if (success) {
+        // 标记推荐为已采用
+        final index = _currentRecommendations.indexWhere((r) => r.id == recommendation.id);
+        if (index != -1) {
+          _currentRecommendations[index] = recommendation.copyWith(isAdopted: true);
+          notifyListeners();
+        }
+      }
+
+      return success;
+    } catch (e) {
+      _setError('采用推荐失败: $e');
+      return false;
+    }
+  }
+
+  /// 将推荐转换为餐食
+  Meal _convertRecommendationToMeal(RecommendedMeal recommendation) {
+    // 创建食物项列表
+    final foodItems = recommendation.ingredients.map((ingredient) {
+      return FoodItem(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        name: ingredient,
+        amount: 1,
+        unit: '份',
+        nutrition: recommendation.nutrition,
+      );
+    }).toList();
+
+    return Meal(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      mealType: recommendation.mealType,
+      name: recommendation.name,
+      description: recommendation.description,
+      dateTime: DateTime.now(),
+      foodItems: foodItems,
+      nutrition: recommendation.nutrition,
+      emotionROI: recommendation.estimatedROI,
+      source: '推荐',
+      cookingTime: recommendation.cookingTime,
+    );
+  }
+
+  /// 检查用户信息是否完整
+  bool isUserProfileComplete() {
+    if (_currentUser == null) return false;
+    return _currentUser!.age != null &&
+        _currentUser!.healthGoal.isNotEmpty &&
+        _currentUser!.preferredCuisines.isNotEmpty;
   }
 
   // ==================== 餐食操作 ====================

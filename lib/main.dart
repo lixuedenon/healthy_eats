@@ -15,10 +15,12 @@ import 'config/theme_config.dart';
 // 导入服务
 import 'core/services/storage_service.dart';
 import 'core/services/notification_service.dart';
+import 'core/services/ai_recommendation_service.dart';
 
 // 导入 Repository
 import 'data/repositories/user_repository.dart';
 import 'data/repositories/meal_repository.dart';
+import 'data/repositories/token_stats_repository.dart';
 
 // 导入 ViewModel
 import 'presentation/viewmodels/user_viewmodel.dart';
@@ -48,24 +50,31 @@ void main() async {
   // 初始化 Repository
   final userRepository = UserRepository(storageService);
   final mealRepository = MealRepository(storageService);
+  final tokenStatsRepository = TokenStatsRepository(storageService);
 
   // 运行应用
   runApp(
     HealthyEatsApp(
+      storageService: storageService,
       userRepository: userRepository,
       mealRepository: mealRepository,
+      tokenStatsRepository: tokenStatsRepository,
     ),
   );
 }
 
 class HealthyEatsApp extends StatelessWidget {
+  final StorageService storageService;
   final UserRepository userRepository;
   final MealRepository mealRepository;
+  final TokenStatsRepository tokenStatsRepository;
 
   const HealthyEatsApp({
     super.key,
+    required this.storageService,
     required this.userRepository,
     required this.mealRepository,
+    required this.tokenStatsRepository,
   });
 
   @override
@@ -110,7 +119,10 @@ class HealthyEatsApp extends StatelessWidget {
             locale: Locale(userViewModel.currentUser?.language ?? 'zh'),
 
             // 启动页
-            home: const AppInitializerPage(),
+            home: AppInitializerPage(
+              storageService: storageService,
+              tokenStatsRepository: tokenStatsRepository,
+            ),
 
             // 关闭调试横幅
             debugShowCheckedModeBanner: false,
@@ -125,7 +137,14 @@ class HealthyEatsApp extends StatelessWidget {
 ///
 /// 负责在后台初始化 ViewModel，完成后跳转到主页
 class AppInitializerPage extends StatefulWidget {
-  const AppInitializerPage({super.key});
+  final StorageService storageService;
+  final TokenStatsRepository tokenStatsRepository;
+
+  const AppInitializerPage({
+    super.key,
+    required this.storageService,
+    required this.tokenStatsRepository,
+  });
 
   @override
   State<AppInitializerPage> createState() => _AppInitializerPageState();
@@ -143,6 +162,24 @@ class _AppInitializerPageState extends State<AppInitializerPage> {
 
   Future<void> _initializeApp() async {
     try {
+      // 检查API Key
+      if (!widget.storageService.hasApiKey()) {
+        setState(() {
+          _statusMessage = '请输入API Key...';
+        });
+
+        // 显示API Key输入对话框
+        final apiKey = await _showApiKeyInputDialog();
+        if (apiKey == null || apiKey.isEmpty) {
+          setState(() {
+            _statusMessage = '未设置API Key，部分功能将不可用';
+          });
+          await Future.delayed(const Duration(seconds: 2));
+        } else {
+          await widget.storageService.saveApiKey(apiKey);
+        }
+      }
+
       setState(() {
         _statusMessage = '加载用户信息...';
       });
@@ -160,6 +197,23 @@ class _AppInitializerPageState extends State<AppInitializerPage> {
 
       // 初始化首页数据
       await homeViewModel.initialize();
+
+      // 初始化AI服务
+      final apiKey = widget.storageService.getApiKey();
+      if (apiKey != null && apiKey.isNotEmpty) {
+        final aiService = AIRecommendationService(
+          apiKey,
+          widget.tokenStatsRepository,
+        );
+        homeViewModel.setAIService(aiService);
+
+        setState(() {
+          _statusMessage = '加载推荐餐食...';
+        });
+
+        // 加载推荐
+        await homeViewModel.loadRecommendations();
+      }
 
       setState(() {
         _statusMessage = '初始化完成！';
@@ -183,6 +237,51 @@ class _AppInitializerPageState extends State<AppInitializerPage> {
       });
       print('App initialization failed: $e');
     }
+  }
+
+  /// 显示API Key输入对话框
+  Future<String?> _showApiKeyInputDialog() async {
+    final controller = TextEditingController();
+
+    return showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Text('设置 OpenAI API Key'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              '请输入您的 OpenAI API Key 以启用AI推荐功能。\n\n'
+              '获取地址：https://platform.openai.com/api-keys',
+              style: TextStyle(fontSize: 14),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: controller,
+              decoration: const InputDecoration(
+                labelText: 'API Key',
+                hintText: 'sk-...',
+                border: OutlineInputBorder(),
+              ),
+              obscureText: true,
+              autofocus: true,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, null),
+            child: const Text('跳过'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, controller.text),
+            child: const Text('确定'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
