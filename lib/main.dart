@@ -52,6 +52,17 @@ void main() async {
   final mealRepository = MealRepository(storageService);
   final tokenStatsRepository = TokenStatsRepository(storageService);
 
+  // 提前加载用户语言偏好
+  String initialLanguage = 'zh'; // 默认中文
+  try {
+    final user = await storageService.getUserProfile();
+    if (user != null && user.language.isNotEmpty) {
+      initialLanguage = user.language;
+    }
+  } catch (e) {
+    print('Failed to load user language preference: $e');
+  }
+
   // 运行应用
   runApp(
     HealthyEatsApp(
@@ -59,6 +70,7 @@ void main() async {
       userRepository: userRepository,
       mealRepository: mealRepository,
       tokenStatsRepository: tokenStatsRepository,
+      initialLanguage: initialLanguage,
     ),
   );
 }
@@ -68,6 +80,7 @@ class HealthyEatsApp extends StatelessWidget {
   final UserRepository userRepository;
   final MealRepository mealRepository;
   final TokenStatsRepository tokenStatsRepository;
+  final String initialLanguage;
 
   const HealthyEatsApp({
     super.key,
@@ -75,6 +88,7 @@ class HealthyEatsApp extends StatelessWidget {
     required this.userRepository,
     required this.mealRepository,
     required this.tokenStatsRepository,
+    required this.initialLanguage,
   });
 
   @override
@@ -92,6 +106,8 @@ class HealthyEatsApp extends StatelessWidget {
       ],
       child: Consumer<UserViewModel>(
         builder: (context, userViewModel, child) {
+          final currentLanguage = userViewModel.currentUser?.language ?? initialLanguage;
+
           return MaterialApp(
             title: 'Healthy Eats',
 
@@ -116,7 +132,7 @@ class HealthyEatsApp extends StatelessWidget {
               Locale('de'), // 德文
               Locale('es'), // 西班牙文
             ],
-            locale: Locale(userViewModel.currentUser?.language ?? 'zh'),
+            locale: Locale(currentLanguage),
 
             // 启动页
             home: AppInitializerPage(
@@ -157,7 +173,9 @@ class _AppInitializerPageState extends State<AppInitializerPage> {
   @override
   void initState() {
     super.initState();
-    _initializeApp();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initializeApp();
+    });
   }
 
   Future<void> _initializeApp() async {
@@ -168,7 +186,6 @@ class _AppInitializerPageState extends State<AppInitializerPage> {
           _statusMessage = '请输入API Key...';
         });
 
-        // 显示API Key输入对话框
         final apiKey = await _showApiKeyInputDialog();
         if (apiKey == null || apiKey.isEmpty) {
           setState(() {
@@ -198,7 +215,7 @@ class _AppInitializerPageState extends State<AppInitializerPage> {
       // 初始化首页数据
       await homeViewModel.initialize();
 
-      // 初始化AI服务
+      // ⭐ 初始化AI服务（但不在启动时加载推荐）
       final apiKey = widget.storageService.getApiKey();
       if (apiKey != null && apiKey.isNotEmpty) {
         final aiService = AIRecommendationService(
@@ -207,12 +224,12 @@ class _AppInitializerPageState extends State<AppInitializerPage> {
         );
         homeViewModel.setAIService(aiService);
 
-        setState(() {
-          _statusMessage = '加载推荐餐食...';
-        });
-
-        // 加载推荐
-        await homeViewModel.loadRecommendations();
+        // ⭐ 不在这里加载推荐，而是在进入主页后后台加载
+        // 注释掉原来的代码：
+        // setState(() {
+        //   _statusMessage = '加载推荐餐食...';
+        // });
+        // await homeViewModel.loadRecommendations();
       }
 
       setState(() {
@@ -220,7 +237,6 @@ class _AppInitializerPageState extends State<AppInitializerPage> {
         _isInitialized = true;
       });
 
-      // 延迟一下让用户看到"完成"消息
       await Future.delayed(const Duration(milliseconds: 500));
 
       // 跳转到主导航页面

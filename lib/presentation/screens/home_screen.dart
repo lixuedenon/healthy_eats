@@ -22,9 +22,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<HomeViewModel>().initialize();
-    });
+    // ⭐ 不在这里调用 initialize，因为已经在 AppInitializerPage 中调用过了
   }
 
   @override
@@ -55,9 +53,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     if (!viewModel.isUserProfileComplete())
                       _buildProfileIncompleteBanner(viewModel),
 
-                    // AI推荐区域
-                    if (viewModel.currentRecommendations.isNotEmpty)
-                      _buildRecommendationsSection(viewModel),
+                    // ⭐ AI推荐区域（5套方案）
+                    _buildRecommendationsSection(viewModel),
 
                     // LQI卡片
                     if (viewModel.todayLQI != null)
@@ -229,8 +226,90 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  /// 构建AI推荐区域
+  /// ⭐ 构建AI推荐区域（5套方案）
   Widget _buildRecommendationsSection(HomeViewModel viewModel) {
+    // 如果正在加载且没有缓存
+    if (viewModel.isLoadingRecommendations && !viewModel.hasRecommendations) {
+      return Container(
+        margin: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: Colors.blue[50],
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.blue[200]!),
+        ),
+        child: Row(
+          children: [
+            const SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '🤖 AI 正在为您准备今日推荐...',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.blue[900],
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '稍后将为您提供 5 套精选方案',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.blue[700],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // 如果没有推荐
+    if (!viewModel.hasRecommendations) {
+      return Container(
+        margin: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: Colors.grey[100],
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.grey[300]!),
+        ),
+        child: Column(
+          children: [
+            Icon(Icons.restaurant_menu, size: 48, color: Colors.grey[400]),
+            const SizedBox(height: 12),
+            Text(
+              '暂无推荐',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey[700],
+              ),
+            ),
+            const SizedBox(height: 8),
+            ElevatedButton.icon(
+              onPressed: () async {
+                await viewModel.refreshRecommendations();
+              },
+              icon: const Icon(Icons.refresh, size: 18),
+              label: const Text('生成推荐'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // 显示推荐
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -239,55 +318,60 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                '📍 今日推荐',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    '📍 今日推荐',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '方案 ${viewModel.currentSetNumber}/${viewModel.totalSets}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                ],
               ),
               Row(
                 children: [
-                  // 模型切换按钮
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.grey[200],
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      children: [
-                        _buildModelButton(
-                          'GPT-4',
-                          viewModel.selectedModel.contains('gpt-4'),
-                          () => viewModel.switchModel('gpt-4'),
-                        ),
-                        _buildModelButton(
-                          'GPT-3.5',
-                          viewModel.selectedModel.contains('gpt-3.5'),
-                          () => viewModel.switchModel('gpt-3.5-turbo'),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  // 换一套按钮
+                  // ⭐ 换一套按钮
                   TextButton.icon(
                     onPressed: viewModel.isLoadingRecommendations
                         ? null
-                        : () async {
-                            await viewModel.refreshRecommendations();
+                        : () {
+                            viewModel.switchToNextSet();
                           },
-                    icon: viewModel.isLoadingRecommendations
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.refresh, size: 18),
+                    icon: const Icon(Icons.swap_horiz, size: 18),
                     label: const Text('换一套'),
                     style: TextButton.styleFrom(
                       foregroundColor: ThemeConfig.primaryColor,
                     ),
+                  ),
+                  const SizedBox(width: 8),
+                  // ⭐ 重新生成按钮
+                  IconButton(
+                    onPressed: viewModel.isLoadingRecommendations
+                        ? null
+                        : () async {
+                            final confirmed = await _showRefreshConfirmDialog();
+                            if (confirmed == true) {
+                              await viewModel.refreshRecommendations();
+                            }
+                          },
+                    icon: viewModel.isLoadingRecommendations
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.refresh),
+                    tooltip: '重新生成',
                   ),
                 ],
               ),
@@ -295,55 +379,48 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
 
-        // 推荐餐食卡片
-        if (viewModel.isLoadingRecommendations)
-          const Center(
-            child: Padding(
-              padding: EdgeInsets.all(40),
-              child: CircularProgressIndicator(),
-            ),
-          )
-        else
-          ...viewModel.currentRecommendations.map(
-            (recommendation) => RecommendedMealCard(
-              meal: recommendation,
-              showModelBadge: true,
-              onAdopt: () async {
-                await viewModel.adoptRecommendation(recommendation);
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('已采用推荐！')),
-                  );
-                }
-              },
-              onViewDetail: () {
-                // TODO: 查看推荐详情
-              },
+        // ⭐ 推荐餐食卡片（当前套餐的3个餐食）
+        ...viewModel.currentRecommendations.map(
+          (recommendation) => RecommendedMealCard(
+            meal: recommendation,
+            showModelBadge: false, // 不显示模型标签（只用GPT-3.5）
+            onAdopt: () async {
+              await viewModel.adoptRecommendation(recommendation);
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('已采用推荐！')),
+                );
+              }
+            },
+            onViewDetail: () {
+              // TODO: 查看推荐详情
+            },
+          ),
+        ),
+
+        // ⭐ 套餐指示器（显示当前是第几套）
+        if (viewModel.totalSets > 1)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(
+                viewModel.totalSets,
+                (index) => Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 4),
+                  width: index == viewModel.currentSetIndex ? 24 : 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    color: index == viewModel.currentSetIndex
+                        ? ThemeConfig.primaryColor
+                        : Colors.grey[300],
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+              ),
             ),
           ),
       ],
-    );
-  }
-
-  /// 构建模型选择按钮
-  Widget _buildModelButton(String label, bool isSelected, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: isSelected ? ThemeConfig.primaryColor : Colors.transparent,
-          borderRadius: BorderRadius.circular(6),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: isSelected ? Colors.white : Colors.black87,
-          ),
-        ),
-      ),
     );
   }
 
@@ -465,6 +542,27 @@ class _HomeScreenState extends State<HomeScreen> {
             onPressed: () => Navigator.pop(context, true),
             style: TextButton.styleFrom(foregroundColor: Colors.red),
             child: const Text('删除'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// ⭐ 显示重新生成确认对话框
+  Future<bool?> _showRefreshConfirmDialog() {
+    return showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('重新生成推荐'),
+        content: const Text('确定要重新生成今日推荐吗？这将替换当前的 5 套方案。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('确定'),
           ),
         ],
       ),

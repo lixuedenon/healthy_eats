@@ -1,6 +1,7 @@
 // lib/presentation/viewmodels/home_viewmodel.dart
 // Dart类文件
 
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../../data/models/user_model.dart';
 import '../../data/models/meal_model.dart';
@@ -12,6 +13,7 @@ import '../../data/repositories/meal_repository.dart';
 import '../../domain/ai_engine/calculators/lqi_calculator.dart';
 import '../../domain/ai_engine/calculators/nutrition_calculator.dart';
 import '../../core/services/ai_recommendation_service.dart';
+import '../../core/services/storage_service.dart';
 
 /// 首页ViewModel
 ///
@@ -43,17 +45,27 @@ class HomeViewModel extends ChangeNotifier {
   DateTime _selectedDate = DateTime.now();
   DateTime get selectedDate => _selectedDate;
 
-  // ==================== 推荐相关状态 ====================
+  // ==================== 推荐相关状态（5套方案）====================
 
-  DualRecommendation? _dualRecommendation;
-  String _selectedModel = 'gpt-4'; // 当前选择的模型
-  String get selectedModel => _selectedModel;
+  List<List<RecommendedMeal>> _allRecommendationSets = []; // 最多5套推荐
+  int _currentSetIndex = 0; // 当前显示第几套（0-4）
 
-  List<RecommendedMeal> _currentRecommendations = [];
-  List<RecommendedMeal> get currentRecommendations => _currentRecommendations;
+  List<RecommendedMeal> get currentRecommendations {
+    if (_allRecommendationSets.isEmpty) return [];
+    return _allRecommendationSets[_currentSetIndex];
+  }
+
+  int get currentSetNumber => _currentSetIndex + 1; // 1-5
+  int get totalSets => _allRecommendationSets.length; // 当前已加载的套数
+  int get currentSetIndex => _currentSetIndex; // 当前索引
+  bool get hasRecommendations => _allRecommendationSets.isNotEmpty;
 
   bool _isLoadingRecommendations = false;
   bool get isLoadingRecommendations => _isLoadingRecommendations;
+
+  // ⭐ 分批加载状态
+  bool _isLoadingMoreSets = false; // 是否正在后台加载更多套餐
+  bool get isLoadingMoreSets => _isLoadingMoreSets;
 
   // ==================== 初始化 ====================
 
@@ -62,6 +74,14 @@ class HomeViewModel extends ChangeNotifier {
     await _loadUserProfile();
     await _loadTodayMeals();
     await _calculateTodayLQI();
+
+    // ⭐ 从缓存加载推荐
+    await _loadRecommendationsFromCache();
+
+    // ⭐ 如果没有推荐，使用分批加载策略
+    if (!hasRecommendations) {
+      _loadRecommendationsWithBatching();
+    }
   }
 
   /// 设置AI服务
@@ -118,47 +138,151 @@ class HomeViewModel extends ChangeNotifier {
     }
   }
 
-  // ==================== AI推荐功能 ====================
+  // ==================== AI推荐功能（分批加载）====================
 
-  /// 加载推荐餐食
-  Future<void> loadRecommendations() async {
+  /// 从缓存加载推荐
+  Future<void> _loadRecommendationsFromCache() async {
+    try {
+      final storageService = await StorageService.getInstance();
+      final cachedData = storageService.getString('cached_recommendations');
+
+      if (cachedData != null) {
+        // 解析缓存的推荐
+        final List<dynamic> setsJson = jsonDecode(cachedData);
+        _allRecommendationSets = setsJson.map<List<RecommendedMeal>>((setJson) {
+          return (setJson as List<dynamic>)
+              .map<RecommendedMeal>((mealJson) => RecommendedMeal.fromJson(mealJson))
+              .toList();
+        }).toList();
+
+        _currentSetIndex = 0;
+        notifyListeners();
+
+        print('✅ 从缓存加载了 ${_allRecommendationSets.length} 套推荐');
+      }
+    } catch (e) {
+      print('❌ 从缓存加载推荐失败: $e');
+    }
+  }
+
+  /// ⭐ 分批加载推荐（先2套，后3套）
+  void _loadRecommendationsWithBatching() {
+    if (_aiService == null) {
+      print('❌ AI服务未初始化');
+      return;
+    }
+
+    // 异步执行，不等待
+    Future.microtask(() async {
+      try {
+        // ============ 第一批：快速生成2套 ============
+        print('🚀 开始快速生成前2套推荐...');
+        _isLoadingRecommendations = true;
+        notifyListeners();
+
+        final firstBatch = await _aiService!.getTwoRecommendationSets(
+          user: _currentUser,
+        );
+
+        // 立即显示前2套
+        _allRecommendationSets = firstBatch;
+        _currentSetIndex = 0;
+        _isLoadingRecommendations = false;
+        notifyListeners();
+
+        print('✅ 前2套推荐已就绪，用户可以立即查看');
+
+        // 保存首批到缓存
+        await _saveRecommendationsToCache();
+
+        // ============ 第二批：后台生成剩余3套 ============
+        print('🔄 后台开始生成剩余3套推荐...');
+        _isLoadingMoreSets = true;
+        notifyListeners();
+
+        final secondBatch = await _aiService!.getThreeRecommendationSets(
+          user: _currentUser,
+        );
+
+        // 添加剩余3套
+        _allRecommendationSets.addAll(secondBatch);
+        _isLoadingMoreSets = false;
+        notifyListeners();
+
+        print('✅ 全部5套推荐已完成');
+
+        // 保存完整的5套到缓存
+        await _saveRecommendationsToCache();
+
+      } catch (e) {
+        _setError('生成推荐失败: $e');
+        _isLoadingRecommendations = false;
+        _isLoadingMoreSets = false;
+        notifyListeners();
+      }
+    });
+  }
+
+  /// 保存推荐到缓存
+  Future<void> _saveRecommendationsToCache() async {
+    try {
+      final storageService = await StorageService.getInstance();
+
+      // 将推荐序列化为JSON
+      final setsJson = _allRecommendationSets.map((set) {
+        return set.map((meal) => meal.toJson()).toList();
+      }).toList();
+
+      final cachedData = jsonEncode(setsJson);
+
+      await storageService.setString('cached_recommendations', cachedData);
+
+      print('💾 推荐已缓存到本地（共 ${_allRecommendationSets.length} 套）');
+    } catch (e) {
+      print('❌ 缓存推荐失败: $e');
+    }
+  }
+
+  /// 手动刷新推荐（重新生成5套，使用分批策略）
+  Future<void> refreshRecommendations() async {
     if (_aiService == null) {
       _setError('AI服务未初始化');
       return;
     }
 
     try {
-      _isLoadingRecommendations = true;
-      notifyListeners();
+      print('🔄 手动刷新推荐（分批加载）...');
 
-      _dualRecommendation = await _aiService!.getDualRecommendations(
-        user: _currentUser,
-      );
+      // 清空旧推荐
+      _allRecommendationSets.clear();
+      _currentSetIndex = 0;
 
-      // 默认显示GPT-4的推荐
-      _currentRecommendations = _dualRecommendation!.gpt4Results;
+      // 使用分批加载策略
+      _loadRecommendationsWithBatching();
 
-      _isLoadingRecommendations = false;
-      notifyListeners();
     } catch (e) {
-      _setError('加载推荐失败: $e');
+      _setError('刷新推荐失败: $e');
       _isLoadingRecommendations = false;
       notifyListeners();
     }
   }
 
-  /// 切换模型
-  void switchModel(String model) {
-    if (_dualRecommendation == null) return;
+  /// 切换到下一套推荐
+  void switchToNextSet() {
+    if (_allRecommendationSets.isEmpty) return;
 
-    _selectedModel = model;
-    _currentRecommendations = _dualRecommendation!.getResults(model);
+    _currentSetIndex = (_currentSetIndex + 1) % _allRecommendationSets.length;
     notifyListeners();
+
+    print('📍 切换到第 ${_currentSetIndex + 1} 套推荐');
   }
 
-  /// 刷新推荐（换一套）
-  Future<void> refreshRecommendations() async {
-    await loadRecommendations();
+  /// 切换到指定的套餐
+  void switchToSet(int index) {
+    if (index < 0 || index >= _allRecommendationSets.length) return;
+
+    _currentSetIndex = index;
+    notifyListeners();
   }
 
   /// 采用推荐
@@ -172,10 +296,19 @@ class HomeViewModel extends ChangeNotifier {
 
       if (success) {
         // 标记推荐为已采用
-        final index = _currentRecommendations.indexWhere((r) => r.id == recommendation.id);
-        if (index != -1) {
-          _currentRecommendations[index] = recommendation.copyWith(isAdopted: true);
-          notifyListeners();
+        final setIndex = _allRecommendationSets.indexWhere(
+          (set) => set.any((m) => m.id == recommendation.id)
+        );
+
+        if (setIndex != -1) {
+          final mealIndex = _allRecommendationSets[setIndex]
+              .indexWhere((m) => m.id == recommendation.id);
+
+          if (mealIndex != -1) {
+            _allRecommendationSets[setIndex][mealIndex] =
+                recommendation.copyWith(isAdopted: true);
+            notifyListeners();
+          }
         }
       }
 

@@ -2,6 +2,7 @@
 // Dart类文件
 
 import 'nutrition_model.dart';
+import 'token_usage_model.dart';
 
 /// 推荐餐食模型
 class RecommendedMeal {
