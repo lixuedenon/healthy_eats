@@ -5,15 +5,10 @@ import 'package:flutter/material.dart';
 import '../../data/models/user_model.dart';
 import '../../data/repositories/user_repository.dart';
 
-/// 用户ViewModel
-///
-/// 管理用户信息的业务逻辑和状态
 class UserViewModel extends ChangeNotifier {
   final UserRepository _userRepository;
 
   UserViewModel(this._userRepository);
-
-  // ==================== 状态 ====================
 
   bool _isLoading = false;
   bool get isLoading => _isLoading;
@@ -24,14 +19,10 @@ class UserViewModel extends ChangeNotifier {
   UserProfile? _currentUser;
   UserProfile? get currentUser => _currentUser;
 
-  // ==================== 初始化 ====================
-
-  /// 初始化用户数据
   Future<void> initialize() async {
     await loadUser();
   }
 
-  /// 加载用户信息
   Future<void> loadUser() async {
     try {
       _setLoading(true);
@@ -48,9 +39,6 @@ class UserViewModel extends ChangeNotifier {
     }
   }
 
-  // ==================== 基础信息更新 ====================
-
-  /// 更新基础信息
   Future<bool> updateBasicInfo({
     String? name,
     String? city,
@@ -84,7 +72,6 @@ class UserViewModel extends ChangeNotifier {
     }
   }
 
-  /// 更新健康目标
   Future<bool> updateHealthGoal(String healthGoal) async {
     try {
       final success = await _userRepository.updateHealthGoal(healthGoal);
@@ -100,9 +87,6 @@ class UserViewModel extends ChangeNotifier {
     }
   }
 
-  // ==================== 餐食偏好更新 ====================
-
-  /// 更新默认餐食来源
   Future<bool> updateDefaultMealSource(int mealSource) async {
     try {
       final success = await _userRepository.updateDefaultMealSource(mealSource);
@@ -118,7 +102,6 @@ class UserViewModel extends ChangeNotifier {
     }
   }
 
-  /// 更新默认就餐方式
   Future<bool> updateDefaultDiningStyle(String diningStyle) async {
     try {
       final success = await _userRepository.updateDefaultDiningStyle(diningStyle);
@@ -134,7 +117,6 @@ class UserViewModel extends ChangeNotifier {
     }
   }
 
-  /// 更新菜系偏好
   Future<bool> updatePreferredCuisines(List<String> cuisines) async {
     try {
       final success = await _userRepository.updatePreferredCuisines(cuisines);
@@ -150,7 +132,6 @@ class UserViewModel extends ChangeNotifier {
     }
   }
 
-  /// 更新零食偏好
   Future<bool> updateSnackFrequency(String frequency) async {
     try {
       final success = await _userRepository.updateSnackFrequency(frequency);
@@ -166,9 +147,6 @@ class UserViewModel extends ChangeNotifier {
     }
   }
 
-  // ==================== 忌口管理 ====================
-
-  /// 更新忌口蔬菜
   Future<bool> updateAvoidVegetables(List<String> vegetables) async {
     try {
       final success = await _userRepository.updateAvoidVegetables(vegetables);
@@ -184,7 +162,6 @@ class UserViewModel extends ChangeNotifier {
     }
   }
 
-  /// 更新忌口水果
   Future<bool> updateAvoidFruits(List<String> fruits) async {
     try {
       final success = await _userRepository.updateAvoidFruits(fruits);
@@ -200,7 +177,6 @@ class UserViewModel extends ChangeNotifier {
     }
   }
 
-  /// 更新忌口肉类
   Future<bool> updateAvoidMeats(List<String> meats) async {
     try {
       final success = await _userRepository.updateAvoidMeats(meats);
@@ -216,7 +192,6 @@ class UserViewModel extends ChangeNotifier {
     }
   }
 
-  /// 更新忌口海鲜
   Future<bool> updateAvoidSeafood(List<String> seafood) async {
     try {
       final success = await _userRepository.updateAvoidSeafood(seafood);
@@ -232,9 +207,6 @@ class UserViewModel extends ChangeNotifier {
     }
   }
 
-  // ==================== 特殊饮食 ====================
-
-  /// 更新素食者状态
   Future<bool> updateVegetarianStatus(bool isVegetarian) async {
     try {
       final success = await _userRepository.updateVegetarianStatus(isVegetarian);
@@ -250,7 +222,6 @@ class UserViewModel extends ChangeNotifier {
     }
   }
 
-  /// 更新血糖偏高状态
   Future<bool> updateHighBloodSugarStatus(bool hasHighBloodSugar) async {
     try {
       final success = await _userRepository.updateHighBloodSugarStatus(hasHighBloodSugar);
@@ -266,9 +237,21 @@ class UserViewModel extends ChangeNotifier {
     }
   }
 
-  // ==================== VIP状态 ====================
+  Future<bool> updateHealthConditions(List<String> conditions) async {
+    try {
+      final success = await _userRepository.updateHealthConditions(conditions);
 
-  /// 更新VIP状态
+      if (success) {
+        await loadUser();
+      }
+
+      return success;
+    } catch (e) {
+      _setError('更新健康状况失败: $e');
+      return false;
+    }
+  }
+
   Future<bool> updateVIPStatus(bool isVIP, {DateTime? expiryDate}) async {
     try {
       final success = await _userRepository.updateVIPStatus(
@@ -287,14 +270,10 @@ class UserViewModel extends ChangeNotifier {
     }
   }
 
-  /// 检查VIP是否有效
   Future<bool> checkVIPStatus() async {
     return await _userRepository.isVIPValid();
   }
 
-  // ==================== 提醒设置 ====================
-
-  /// 更新提醒设置
   Future<bool> updateReminderSettings({
     bool? enableBreakfastReminder,
     String? breakfastTime,
@@ -334,9 +313,6 @@ class UserViewModel extends ChangeNotifier {
     }
   }
 
-  // ==================== 语言设置 ====================
-
-  /// 更新语言设置
   Future<bool> updateLanguage(String language) async {
     try {
       final success = await _userRepository.updateLanguage(language);
@@ -352,8 +328,6 @@ class UserViewModel extends ChangeNotifier {
     }
   }
 
-  // ==================== 辅助方法 ====================
-
   void _setLoading(bool value) {
     _isLoading = value;
     notifyListeners();
@@ -363,7 +337,6 @@ class UserViewModel extends ChangeNotifier {
     _errorMessage = message;
     notifyListeners();
 
-    // 3秒后清除错误消息
     Future.delayed(const Duration(seconds: 3), () {
       _errorMessage = null;
       notifyListeners();
@@ -375,9 +348,6 @@ class UserViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ==================== 用户信息验证 ====================
-
-  /// 检查是否需要完善个人信息
   bool needsProfileCompletion() {
     if (_currentUser == null) return true;
 
@@ -387,15 +357,69 @@ class UserViewModel extends ChangeNotifier {
            _currentUser!.weight == null;
   }
 
-  /// 获取个人信息完成度（百分比）
+  bool hasFilledAnyInfo() {
+    if (_currentUser == null) return false;
+
+    return _currentUser!.name != '用户' ||
+           _currentUser!.age != null ||
+           _currentUser!.height != null ||
+           _currentUser!.weight != null ||
+           _currentUser!.gender != null ||
+           (_currentUser!.city != null && _currentUser!.city!.isNotEmpty) ||
+           _currentUser!.preferredCuisines.isNotEmpty ||
+           _currentUser!.avoidVegetables.isNotEmpty ||
+           _currentUser!.avoidFruits.isNotEmpty ||
+           _currentUser!.avoidMeats.isNotEmpty ||
+           _currentUser!.avoidSeafood.isNotEmpty ||
+           _currentUser!.healthConditions.any((c) => c != '无') ||
+           _currentUser!.defaultMealSource != 3;
+  }
+
+  bool isFieldIncomplete(String fieldName) {
+    if (_currentUser == null) return true;
+
+    switch (fieldName) {
+      case 'basicInfo':
+        return _currentUser!.age == null ||
+               _currentUser!.height == null ||
+               _currentUser!.weight == null ||
+               _currentUser!.gender == null ||
+               _currentUser!.city == null ||
+               _currentUser!.city!.isEmpty;
+      case 'healthGoal':
+        return _currentUser!.healthGoal == '维持';
+      case 'mealSource':
+        return _currentUser!.defaultMealSource == 3;
+      case 'diningStyle':
+        return _currentUser!.defaultDiningStyle == '主要自己吃';
+      case 'cuisines':
+        return _currentUser!.preferredCuisines.isEmpty ||
+               (_currentUser!.preferredCuisines.length == 1 &&
+                _currentUser!.preferredCuisines.first == '中餐');
+      case 'snack':
+        return _currentUser!.snackFrequency == '很少吃';
+      case 'avoidance':
+        return _currentUser!.avoidVegetables.isEmpty &&
+               _currentUser!.avoidFruits.isEmpty &&
+               _currentUser!.avoidMeats.isEmpty &&
+               _currentUser!.avoidSeafood.isEmpty;
+      case 'healthConditions':
+        return _currentUser!.healthConditions.isEmpty ||
+               (_currentUser!.healthConditions.length == 1 &&
+                _currentUser!.healthConditions.first == '无');
+      default:
+        return false;
+    }
+  }
+
   int getProfileCompletionPercentage() {
     if (_currentUser == null) return 0;
 
     int completed = 0;
-    int total = 10;
+    int total = 11;
 
     if (_currentUser!.name != '用户') completed++;
-    if (_currentUser!.city != null) completed++;
+    if (_currentUser!.city != null && _currentUser!.city!.isNotEmpty) completed++;
     if (_currentUser!.age != null) completed++;
     if (_currentUser!.height != null) completed++;
     if (_currentUser!.weight != null) completed++;
@@ -407,6 +431,7 @@ class UserViewModel extends ChangeNotifier {
         _currentUser!.avoidSeafood.isNotEmpty) completed++;
     if (_currentUser!.defaultMealSource > 0) completed++;
     if (_currentUser!.defaultDiningStyle.isNotEmpty) completed++;
+    if (_currentUser!.healthConditions.any((c) => c != '无')) completed++;
 
     return ((completed / total) * 100).round();
   }

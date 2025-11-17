@@ -6,12 +6,14 @@ import 'package:provider/provider.dart';
 import '../viewmodels/user_viewmodel.dart';
 import '../../config/theme_config.dart';
 
-/// 设置页面
-///
-/// 显示各种设置选项
-class SettingsScreen extends StatelessWidget {
+class SettingsScreen extends StatefulWidget {
   const SettingsScreen({Key? key}) : super(key: key);
 
+  @override
+  State<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -21,250 +23,130 @@ class SettingsScreen extends StatelessWidget {
       ),
       body: Consumer<UserViewModel>(
         builder: (context, viewModel, child) {
-          if (viewModel.currentUser == null) {
+          if (viewModel.isLoading) {
             return const Center(child: CircularProgressIndicator());
           }
 
-          final user = viewModel.currentUser!;
+          final user = viewModel.currentUser;
+          if (user == null) {
+            return const Center(child: Text('加载失败'));
+          }
 
           return ListView(
             children: [
-              // 用户信息卡片
-              _buildUserCard(context, user),
-
-              const Divider(height: 1),
-
-              // 个人信息
-              _buildSection(
-                context,
-                title: '个人信息',
-                children: [
-                  _buildListTile(
-                    icon: Icons.person,
-                    title: '基本信息',
-                    subtitle: '姓名、年龄、身高、体重等',
-                    onTap: () {
-                      // TODO: 跳转到基本信息编辑页
-                    },
-                  ),
-                  _buildListTile(
-                    icon: Icons.favorite,
-                    title: '健康目标',
-                    subtitle: user.healthGoal,
-                    onTap: () {
-                      _showHealthGoalDialog(context, viewModel);
-                    },
-                  ),
-                ],
+              _buildSectionHeader('个人信息'),
+              _buildListTile(
+                icon: Icons.person,
+                title: '基本信息',
+                subtitle: _getBasicInfoSubtitle(user),
+                onTap: () => _showBasicInfoDialog(viewModel),
+                isIncomplete: viewModel.isFieldIncomplete('basicInfo'),
               ),
 
               const Divider(height: 1),
 
-              // 餐食偏好
-              _buildSection(
-                context,
-                title: '餐食偏好',
-                children: [
-                  _buildListTile(
-                    icon: Icons.restaurant,
-                    title: '餐食来源',
-                    subtitle: _getMealSourceText(user.defaultMealSource),
-                    onTap: () {
-                      // TODO: 跳转到餐食来源设置页
-                    },
-                  ),
-                  _buildListTile(
-                    icon: Icons.people,
-                    title: '就餐方式',
-                    subtitle: user.defaultDiningStyle,
-                    onTap: () {
-                      // TODO: 跳转到就餐方式设置页
-                    },
-                  ),
-                  _buildListTile(
-                    icon: Icons.public,
-                    title: '菜系偏好',
-                    subtitle: user.preferredCuisines.isEmpty
-                        ? '未设置'
-                        : user.preferredCuisines.take(3).join('、'),
-                    onTap: () {
-                      // TODO: 跳转到菜系偏好设置页
-                    },
-                  ),
-                  _buildListTile(
-                    icon: Icons.cookie,
-                    title: '零食偏好',
-                    subtitle: user.snackFrequency,
-                    onTap: () {
-                      // TODO: 跳转到零食偏好设置页
-                    },
-                  ),
-                ],
+              _buildSectionHeader('健康目标'),
+              _buildListTile(
+                icon: Icons.flag,
+                title: '健康目标',
+                subtitle: user.healthGoal,
+                onTap: () => _showHealthGoalDialog(viewModel),
+                isIncomplete: viewModel.isFieldIncomplete('healthGoal'),
+              ),
+              _buildListTile(
+                icon: Icons.health_and_safety,
+                title: '健康状况',
+                subtitle: user.getHealthConditionsDisplay(),
+                onTap: () => _showHealthConditionsDialog(viewModel),
+                isIncomplete: viewModel.isFieldIncomplete('healthConditions'),
               ),
 
               const Divider(height: 1),
 
-              // 忌口管理
-              _buildSection(
-                context,
+              _buildSectionHeader('饮食偏好'),
+              _buildListTile(
+                icon: Icons.restaurant,
+                title: '餐食来源',
+                subtitle: _getMealSourceText(user.defaultMealSource),
+                onTap: () => _showMealSourceDialog(viewModel),
+                isIncomplete: viewModel.isFieldIncomplete('mealSource'),
+              ),
+              _buildListTile(
+                icon: Icons.people,
+                title: '就餐方式',
+                subtitle: user.defaultDiningStyle,
+                onTap: () => _showDiningStyleDialog(viewModel),
+                isIncomplete: viewModel.isFieldIncomplete('diningStyle'),
+              ),
+              _buildListTile(
+                icon: Icons.fastfood,
+                title: '菜系偏好',
+                subtitle: user.preferredCuisines.join('、'),
+                onTap: () => _showCuisinePreferenceDialog(viewModel),
+                isIncomplete: viewModel.isFieldIncomplete('cuisines'),
+              ),
+              _buildListTile(
+                icon: Icons.cookie,
+                title: '零食偏好',
+                subtitle: user.snackFrequency,
+                onTap: () => _showSnackFrequencyDialog(viewModel),
+                isIncomplete: viewModel.isFieldIncomplete('snack'),
+              ),
+
+              const Divider(height: 1),
+
+              _buildSectionHeader('忌口设置'),
+              _buildListTile(
+                icon: Icons.block,
                 title: '忌口管理',
-                children: [
-                  _buildListTile(
-                    icon: Icons.block,
-                    title: '忌口食材',
-                    subtitle: _getAvoidanceCountText(user),
-                    onTap: () {
-                      // TODO: 跳转到忌口设置页
-                    },
-                  ),
-                  if (user.isVegetarian)
-                    _buildListTile(
-                      icon: Icons.eco,
-                      title: '素食者',
-                      subtitle: '已启用素食模式',
-                      trailing: const Icon(Icons.check_circle, color: Colors.green),
-                    ),
-                  if (user.hasHighBloodSugar)
-                    _buildListTile(
-                      icon: Icons.medical_services,
-                      title: '血糖管理',
-                      subtitle: '已启用血糖控制模式',
-                      trailing: const Icon(Icons.check_circle, color: Colors.orange),
-                    ),
-                ],
+                subtitle: _getAvoidanceSubtitle(user),
+                onTap: () => _showAvoidanceDialog(viewModel),
+                isIncomplete: viewModel.isFieldIncomplete('avoidance'),
+              ),
+              _buildSwitchTile(
+                icon: Icons.eco,
+                title: '素食者',
+                value: user.isVegetarian,
+                onChanged: (value) async {
+                  await viewModel.updateVegetarianStatus(value);
+                },
+              ),
+              _buildSwitchTile(
+                icon: Icons.water_drop,
+                title: '需要控制血糖',
+                value: user.hasHighBloodSugar,
+                onChanged: (value) async {
+                  await viewModel.updateHighBloodSugarStatus(value);
+                },
               ),
 
               const Divider(height: 1),
 
-              // 提醒设置
-              _buildSection(
-                context,
+              _buildSectionHeader('其他设置'),
+              _buildListTile(
+                icon: Icons.notifications,
                 title: '提醒设置',
-                children: [
-                  _buildSwitchTile(
-                    icon: Icons.alarm,
-                    title: '早餐提醒',
-                    subtitle: user.enableBreakfastReminder
-                        ? '${user.breakfastTime}'
-                        : '已关闭',
-                    value: user.enableBreakfastReminder,
-                    onChanged: (value) {
-                      viewModel.updateReminderSettings(
-                        enableBreakfastReminder: value,
-                      );
-                    },
-                  ),
-                  _buildSwitchTile(
-                    icon: Icons.alarm,
-                    title: '午餐提醒',
-                    subtitle: user.enableLunchReminder
-                        ? '${user.lunchTime}'
-                        : '已关闭',
-                    value: user.enableLunchReminder,
-                    onChanged: (value) {
-                      viewModel.updateReminderSettings(
-                        enableLunchReminder: value,
-                      );
-                    },
-                  ),
-                  _buildSwitchTile(
-                    icon: Icons.alarm,
-                    title: '晚餐提醒',
-                    subtitle: user.enableDinnerReminder
-                        ? '${user.dinnerTime}'
-                        : '已关闭',
-                    value: user.enableDinnerReminder,
-                    onChanged: (value) {
-                      viewModel.updateReminderSettings(
-                        enableDinnerReminder: value,
-                      );
-                    },
-                  ),
-                ],
+                subtitle: '餐食提醒、饮水提醒等',
+                onTap: () {
+                  // TODO: 跳转到提醒设置页面
+                },
               ),
-
-              const Divider(height: 1),
-
-              // 应用设置
-              _buildSection(
-                context,
-                title: '应用设置',
-                children: [
-                  _buildListTile(
-                    icon: Icons.language,
-                    title: '语言',
-                    subtitle: _getLanguageText(user.language),
-                    onTap: () {
-                      _showLanguageDialog(context, viewModel);
-                    },
-                  ),
-                  _buildListTile(
-                    icon: Icons.palette,
-                    title: '主题',
-                    subtitle: '浅色',
-                    onTap: () {
-                      // TODO: 主题切换
-                    },
-                  ),
-                ],
+              _buildListTile(
+                icon: Icons.language,
+                title: '语言',
+                subtitle: user.language == 'zh' ? '简体中文' : 'English',
+                onTap: () {
+                  // TODO: 语言切换
+                },
               ),
-
-              const Divider(height: 1),
-
-              // VIP会员
-              _buildSection(
-                context,
-                title: 'VIP会员',
-                children: [
-                  _buildListTile(
-                    icon: Icons.star,
-                    title: user.isVIPValid ? 'VIP会员' : '升级VIP',
-                    subtitle: user.isVIPValid
-                        ? '到期时间: ${_formatDate(user.vipExpiryDate)}'
-                        : '解锁更多功能',
-                    trailing: user.isVIPValid
-                        ? const Icon(Icons.check_circle, color: Colors.amber)
-                        : const Icon(Icons.chevron_right),
-                    onTap: () {
-                      // TODO: 跳转到VIP页面
-                    },
-                  ),
-                ],
-              ),
-
-              const Divider(height: 1),
-
-              // 关于
-              _buildSection(
-                context,
+              _buildListTile(
+                icon: Icons.info,
                 title: '关于',
-                children: [
-                  _buildListTile(
-                    icon: Icons.info,
-                    title: '关于应用',
-                    subtitle: '版本 1.0.0',
-                    onTap: () {
-                      _showAboutDialog(context);
-                    },
-                  ),
-                  _buildListTile(
-                    icon: Icons.privacy_tip,
-                    title: '隐私政策',
-                    onTap: () {
-                      // TODO: 显示隐私政策
-                    },
-                  ),
-                  _buildListTile(
-                    icon: Icons.description,
-                    title: '用户协议',
-                    onTap: () {
-                      // TODO: 显示用户协议
-                    },
-                  ),
-                ],
+                subtitle: 'Healthy Eats v1.0.0',
+                onTap: () {
+                  // TODO: 关于页面
+                },
               ),
-
-              const SizedBox(height: 20),
             ],
           );
         },
@@ -272,266 +154,690 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
-  /// 构建用户卡片
-  Widget _buildUserCard(BuildContext context, user) {
+  Widget _buildSectionHeader(String title) {
     return Container(
-      margin: const EdgeInsets.all(16),
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            ThemeConfig.primaryColor,
-            ThemeConfig.primaryColor.withOpacity(0.8),
-          ],
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      color: Colors.grey[100],
+      child: Text(
+        title,
+        style: TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.bold,
+          color: Colors.grey[700],
         ),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        children: [
-          // 头像
-          Container(
-            width: 60,
-            height: 60,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              shape: BoxShape.circle,
-            ),
-            child: const Center(
-              child: Text(
-                '👤',
-                style: TextStyle(fontSize: 30),
-              ),
-            ),
-          ),
-
-          const SizedBox(width: 16),
-
-          // 用户信息
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  user.name,
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  user.city ?? '未设置城市',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: Colors.white70,
-                  ),
-                ),
-                if (user.bmi != null) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    'BMI: ${user.bmi!.toStringAsFixed(1)} (${user.bmiRating})',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: Colors.white60,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-
-          // VIP标识
-          if (user.isVIPValid)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: Colors.amber,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Text(
-                'VIP',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              ),
-            ),
-        ],
       ),
     );
   }
 
-  /// 构建分组
-  Widget _buildSection(
-    BuildContext context, {
-    required String title,
-    required List<Widget> children,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-          child: Text(
-            title,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-              color: ThemeConfig.primaryColor,
-            ),
-          ),
-        ),
-        ...children,
-      ],
-    );
-  }
-
-  /// 构建列表项
   Widget _buildListTile({
     required IconData icon,
     required String title,
     String? subtitle,
-    Widget? trailing,
     VoidCallback? onTap,
+    bool isIncomplete = false,
   }) {
     return ListTile(
-      leading: Icon(icon, color: ThemeConfig.primaryColor),
-      title: Text(title),
-      subtitle: subtitle != null ? Text(subtitle) : null,
-      trailing: trailing ?? const Icon(Icons.chevron_right),
+      leading: Icon(
+        icon,
+        color: isIncomplete ? Colors.orange[700] : ThemeConfig.primaryColor,
+      ),
+      title: Row(
+        children: [
+          Text(
+            title,
+            style: TextStyle(
+              color: isIncomplete ? Colors.orange[900] : null,
+              fontWeight: isIncomplete ? FontWeight.w600 : null,
+            ),
+          ),
+          if (isIncomplete) ...[
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: Colors.orange[100],
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                '未完善',
+                style: TextStyle(
+                  fontSize: 10,
+                  color: Colors.orange[900],
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+      subtitle: subtitle != null
+          ? Text(
+              subtitle,
+              style: TextStyle(
+                color: isIncomplete ? Colors.orange[700] : null,
+              ),
+            )
+          : null,
+      trailing: Icon(
+        Icons.chevron_right,
+        color: isIncomplete ? Colors.orange[700] : null,
+      ),
       onTap: onTap,
     );
   }
 
-  /// 构建开关列表项
   Widget _buildSwitchTile({
     required IconData icon,
     required String title,
-    String? subtitle,
     required bool value,
     required ValueChanged<bool> onChanged,
   }) {
-    return ListTile(
-      leading: Icon(icon, color: ThemeConfig.primaryColor),
+    return SwitchListTile(
+      secondary: Icon(icon, color: ThemeConfig.primaryColor),
       title: Text(title),
-      subtitle: subtitle != null ? Text(subtitle) : null,
-      trailing: Switch(
-        value: value,
-        onChanged: onChanged,
-        activeColor: ThemeConfig.primaryColor,
-      ),
+      value: value,
+      onChanged: onChanged,
+      activeColor: ThemeConfig.primaryColor,
     );
   }
 
-  // ==================== 对话框 ====================
+  String _getBasicInfoSubtitle(user) {
+    List<String> parts = [];
 
-  /// 显示健康目标选择对话框
-  void _showHealthGoalDialog(BuildContext context, UserViewModel viewModel) {
-    final goals = ['减脂', '增肌', '维持', '随意'];
+    if (user.gender != null) parts.add(user.gender!);
+    if (user.age != null) parts.add('${user.age}岁');
+    if (user.height != null) parts.add('${user.height}cm');
+    if (user.weight != null) parts.add('${user.weight}kg');
+    if (user.city != null && user.city!.isNotEmpty) parts.add(user.city!);
 
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('选择健康目标'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: goals.map((goal) => RadioListTile<String>(
-            title: Text(goal),
-            value: goal,
-            groupValue: viewModel.currentUser?.healthGoal,
-            onChanged: (value) {
-              if (value != null) {
-                viewModel.updateHealthGoal(value);
-                Navigator.pop(context);
-              }
-            },
-          )).toList(),
-        ),
-      ),
-    );
+    return parts.isEmpty ? '未设置' : parts.join(' / ');
   }
-
-  /// 显示语言选择对话框
-  void _showLanguageDialog(BuildContext context, UserViewModel viewModel) {
-    final languages = {
-      'zh': '中文',
-      'en': 'English',
-      'es': 'Español',
-      'ja': '日本語',
-    };
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('选择语言'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: languages.entries.map((entry) => RadioListTile<String>(
-            title: Text(entry.value),
-            value: entry.key,
-            groupValue: viewModel.currentUser?.language,
-            onChanged: (value) {
-              if (value != null) {
-                viewModel.updateLanguage(value);
-                Navigator.pop(context);
-              }
-            },
-          )).toList(),
-        ),
-      ),
-    );
-  }
-
-  /// 显示关于对话框
-  void _showAboutDialog(BuildContext context) {
-    showAboutDialog(
-      context: context,
-      applicationName: 'Healthy Eats',
-      applicationVersion: '1.0.0',
-      applicationIcon: const Text('🍽️', style: TextStyle(fontSize: 40)),
-      children: [
-        const Text('AI驱动的智能健康饮食管理应用'),
-        const SizedBox(height: 8),
-        const Text('© 2025 Healthy Eats Team'),
-      ],
-    );
-  }
-
-  // ==================== 辅助方法 ====================
 
   String _getMealSourceText(int level) {
     const texts = {
       1: '基本外食',
       2: '较多外食',
-      3: '对半',
+      3: '外食与自制各半',
       4: '较多自己做',
       5: '基本自己做',
     };
     return texts[level] ?? '未设置';
   }
 
-  String _getAvoidanceCountText(user) {
+  String _getAvoidanceSubtitle(user) {
     int count = user.avoidVegetables.length +
-                user.avoidFruits.length +
-                user.avoidMeats.length +
-                user.avoidSeafood.length;
-    return count > 0 ? '已设置 $count 项' : '未设置';
+        user.avoidFruits.length +
+        user.avoidMeats.length +
+        user.avoidSeafood.length;
+
+    return count > 0 ? '已设置 $count 项忌口' : '无忌口';
   }
 
-  String _getLanguageText(String code) {
-    const languages = {
-      'zh': '中文',
-      'en': 'English',
-      'es': 'Español',
-      'ja': '日本語',
+  Future<void> _showBasicInfoDialog(UserViewModel viewModel) async {
+    final user = viewModel.currentUser!;
+
+    final genderController = TextEditingController(text: user.gender ?? '');
+    final cityController = TextEditingController(text: user.city ?? '');
+    final ageController = TextEditingController(text: user.age?.toString() ?? '');
+    final heightController = TextEditingController(text: user.height?.toString() ?? '');
+    final weightController = TextEditingController(text: user.weight?.toString() ?? '');
+
+    String? selectedGender = user.gender;
+
+    await showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text('基本信息'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DropdownButtonFormField<String>(
+                  value: selectedGender,
+                  decoration: const InputDecoration(
+                    labelText: '性别',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: ['男', '女', '其他'].map((gender) {
+                    return DropdownMenuItem(
+                      value: gender,
+                      child: Text(gender),
+                    );
+                  }).toList(),
+                  onChanged: (value) {
+                    setState(() {
+                      selectedGender = value;
+                    });
+                  },
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: cityController,
+                  decoration: const InputDecoration(
+                    labelText: '城市',
+                    hintText: '如：北京、上海、旧金山',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: ageController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: '年龄',
+                    border: OutlineInputBorder(),
+                    suffixText: '岁',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: heightController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: '身高',
+                    border: OutlineInputBorder(),
+                    suffixText: 'cm',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: weightController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: '体重',
+                    border: OutlineInputBorder(),
+                    suffixText: 'kg',
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('取消'),
+            ),
+            TextButton(
+              onPressed: () async {
+                await viewModel.updateBasicInfo(
+                  gender: selectedGender,
+                  city: cityController.text.trim().isNotEmpty ? cityController.text.trim() : null,
+                  age: int.tryParse(ageController.text),
+                  height: double.tryParse(heightController.text),
+                  weight: double.tryParse(weightController.text),
+                );
+                if (mounted) Navigator.pop(context);
+              },
+              child: const Text('保存'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showHealthGoalDialog(UserViewModel viewModel) async {
+    final user = viewModel.currentUser!;
+    String? selectedGoal = user.healthGoal;
+
+    await showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text('健康目标'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              '减脂',
+              '增肌',
+              '维持',
+              '随意',
+              '胡吃海塞',
+              '清汤寡欲',
+            ].map((goal) {
+              return RadioListTile<String>(
+                title: Text(goal),
+                value: goal,
+                groupValue: selectedGoal,
+                onChanged: (value) {
+                  setState(() {
+                    selectedGoal = value;
+                  });
+                },
+                activeColor: ThemeConfig.primaryColor,
+              );
+            }).toList(),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('取消'),
+            ),
+            TextButton(
+              onPressed: () async {
+                if (selectedGoal != null) {
+                  await viewModel.updateHealthGoal(selectedGoal!);
+                }
+                if (mounted) Navigator.pop(context);
+              },
+              child: const Text('保存'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showHealthConditionsDialog(UserViewModel viewModel) async {
+    final user = viewModel.currentUser!;
+    List<String> selectedConditions = List.from(user.healthConditions);
+
+    final availableConditions = [
+      '无',
+      '高血压',
+      '高血脂',
+      '高血糖/糖尿病',
+      '甲亢',
+      '甲减',
+      '痛风',
+      '肾病',
+      '心脏病',
+      '脂肪肝',
+      '胃病',
+      '其他',
+    ];
+
+    await showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text('健康状况'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: availableConditions.map((condition) {
+                final isSelected = selectedConditions.contains(condition);
+                final isNone = condition == '无';
+
+                return CheckboxListTile(
+                  title: Text(condition),
+                  subtitle: _getHealthConditionDescription(condition),
+                  value: isSelected,
+                  onChanged: (value) {
+                    setState(() {
+                      if (isNone) {
+                        if (value == true) {
+                          selectedConditions = ['无'];
+                        }
+                      } else {
+                        if (value == true) {
+                          selectedConditions.remove('无');
+                          selectedConditions.add(condition);
+                        } else {
+                          selectedConditions.remove(condition);
+                          if (selectedConditions.isEmpty) {
+                            selectedConditions = ['无'];
+                          }
+                        }
+                      }
+                    });
+                  },
+                  activeColor: ThemeConfig.primaryColor,
+                );
+              }).toList(),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('取消'),
+            ),
+            TextButton(
+              onPressed: () async {
+                await viewModel.updateHealthConditions(selectedConditions);
+                if (mounted) Navigator.pop(context);
+              },
+              child: const Text('保存'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget? _getHealthConditionDescription(String condition) {
+    final descriptions = {
+      '高血压': '避免高盐、腌制食品',
+      '高血脂': '避免高脂肪、油腻食物',
+      '高血糖/糖尿病': '避免高GI食物、甜食',
+      '甲亢': '避免海带、紫菜等高碘食物',
+      '痛风': '避免海鲜、动物内脏、啤酒',
+      '肾病': '低蛋白、低盐饮食',
+      '心脏病': '低脂、低盐饮食',
+      '脂肪肝': '低脂、低糖饮食',
+      '胃病': '避免刺激性食物',
     };
-    return languages[code] ?? '中文';
+
+    final desc = descriptions[condition];
+    if (desc == null) return null;
+
+    return Text(
+      desc,
+      style: const TextStyle(fontSize: 11, color: Colors.grey),
+    );
   }
 
-  String _formatDate(DateTime? date) {
-    if (date == null) return '未设置';
-    return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+  Future<void> _showMealSourceDialog(UserViewModel viewModel) async {
+    final user = viewModel.currentUser!;
+    int selectedSource = user.defaultMealSource;
+
+    await showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text('餐食来源'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [1, 2, 3, 4, 5].map((level) {
+              return RadioListTile<int>(
+                title: Text(_getMealSourceText(level)),
+                subtitle: Text(_getMealSourceDescription(level)),
+                value: level,
+                groupValue: selectedSource,
+                onChanged: (value) {
+                  setState(() {
+                    selectedSource = value!;
+                  });
+                },
+                activeColor: ThemeConfig.primaryColor,
+              );
+            }).toList(),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('取消'),
+            ),
+            TextButton(
+              onPressed: () async {
+                await viewModel.updateDefaultMealSource(selectedSource);
+                if (mounted) Navigator.pop(context);
+              },
+              child: const Text('保存'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _getMealSourceDescription(int level) {
+    const descriptions = {
+      1: '几乎所有餐食都在外面吃',
+      2: '大部分餐食在外面吃',
+      3: '外食和自己做各占一半',
+      4: '大部分餐食自己做',
+      5: '几乎所有餐食都自己做',
+    };
+    return descriptions[level] ?? '';
+  }
+
+  Future<void> _showDiningStyleDialog(UserViewModel viewModel) async {
+    final user = viewModel.currentUser!;
+    String? selectedStyle = user.defaultDiningStyle;
+
+    await showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text('就餐方式'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              '主要自己吃',
+              '经常和朋友家人',
+              '经常和同事',
+            ].map((style) {
+              return RadioListTile<String>(
+                title: Text(style),
+                value: style,
+                groupValue: selectedStyle,
+                onChanged: (value) {
+                  setState(() {
+                    selectedStyle = value;
+                  });
+                },
+                activeColor: ThemeConfig.primaryColor,
+              );
+            }).toList(),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('取消'),
+            ),
+            TextButton(
+              onPressed: () async {
+                if (selectedStyle != null) {
+                  await viewModel.updateDefaultDiningStyle(selectedStyle!);
+                }
+                if (mounted) Navigator.pop(context);
+              },
+              child: const Text('保存'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showCuisinePreferenceDialog(UserViewModel viewModel) async {
+    final user = viewModel.currentUser!;
+    List<String> selectedCuisines = List.from(user.preferredCuisines);
+
+    final availableCuisines = [
+      '中餐',
+      '川菜',
+      '粤菜',
+      '湘菜',
+      '鲁菜',
+      '西餐',
+      '日餐',
+      '韩餐',
+      '东南亚菜',
+      '其他',
+    ];
+
+    await showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text('菜系偏好（可多选）'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: availableCuisines.map((cuisine) {
+                return CheckboxListTile(
+                  title: Text(cuisine),
+                  value: selectedCuisines.contains(cuisine),
+                  onChanged: (value) {
+                    setState(() {
+                      if (value == true) {
+                        selectedCuisines.add(cuisine);
+                      } else {
+                        selectedCuisines.remove(cuisine);
+                      }
+                    });
+                  },
+                  activeColor: ThemeConfig.primaryColor,
+                );
+              }).toList(),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('取消'),
+            ),
+            TextButton(
+              onPressed: () async {
+                if (selectedCuisines.isNotEmpty) {
+                  await viewModel.updatePreferredCuisines(selectedCuisines);
+                }
+                if (mounted) Navigator.pop(context);
+              },
+              child: const Text('保存'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showSnackFrequencyDialog(UserViewModel viewModel) async {
+    final user = viewModel.currentUser!;
+    String? selectedFrequency = user.snackFrequency;
+
+    await showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text('零食偏好'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              '很少吃',
+              '偶尔吃',
+              '经常吃',
+              '每天都吃',
+            ].map((frequency) {
+              return RadioListTile<String>(
+                title: Text(frequency),
+                value: frequency,
+                groupValue: selectedFrequency,
+                onChanged: (value) {
+                  setState(() {
+                    selectedFrequency = value;
+                  });
+                },
+                activeColor: ThemeConfig.primaryColor,
+              );
+            }).toList(),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('取消'),
+            ),
+            TextButton(
+              onPressed: () async {
+                if (selectedFrequency != null) {
+                  await viewModel.updateSnackFrequency(selectedFrequency!);
+                }
+                if (mounted) Navigator.pop(context);
+              },
+              child: const Text('保存'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showAvoidanceDialog(UserViewModel viewModel) async {
+    final user = viewModel.currentUser!;
+
+    List<String> selectedVegetables = List.from(user.avoidVegetables);
+    List<String> selectedFruits = List.from(user.avoidFruits);
+    List<String> selectedMeats = List.from(user.avoidMeats);
+    List<String> selectedSeafood = List.from(user.avoidSeafood);
+
+    final vegetables = ['芹菜', '香菜', '洋葱', '大蒜', '韭菜', '茄子', '苦瓜', '青椒'];
+    final fruits = ['榴莲', '芒果', '菠萝', '猕猴桃', '火龙果', '柚子'];
+    final meats = ['猪肉', '牛肉', '羊肉', '鸡肉', '鸭肉', '内脏'];
+    final seafood = ['虾', '蟹', '贝类', '鱼', '海参', '海蜇'];
+
+    await showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => DefaultTabController(
+          length: 4,
+          child: AlertDialog(
+            title: const Text('忌口管理'),
+            content: SizedBox(
+              width: double.maxFinite,
+              height: 400,
+              child: Column(
+                children: [
+                  const TabBar(
+                    labelColor: ThemeConfig.primaryColor,
+                    unselectedLabelColor: Colors.grey,
+                    indicatorColor: ThemeConfig.primaryColor,
+                    tabs: [
+                      Tab(text: '蔬菜'),
+                      Tab(text: '水果'),
+                      Tab(text: '肉类'),
+                      Tab(text: '海鲜'),
+                    ],
+                  ),
+                  Expanded(
+                    child: TabBarView(
+                      children: [
+                        _buildAvoidanceList(vegetables, selectedVegetables, setState),
+                        _buildAvoidanceList(fruits, selectedFruits, setState),
+                        _buildAvoidanceList(meats, selectedMeats, setState),
+                        _buildAvoidanceList(seafood, selectedSeafood, setState),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('取消'),
+              ),
+              TextButton(
+                onPressed: () async {
+                  await viewModel.updateAvoidVegetables(selectedVegetables);
+                  await viewModel.updateAvoidFruits(selectedFruits);
+                  await viewModel.updateAvoidMeats(selectedMeats);
+                  await viewModel.updateAvoidSeafood(selectedSeafood);
+                  if (mounted) Navigator.pop(context);
+                },
+                child: const Text('保存'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAvoidanceList(
+    List<String> items,
+    List<String> selected,
+    StateSetter setState,
+  ) {
+    return ListView(
+      children: items.map((item) {
+        return CheckboxListTile(
+          title: Text(item),
+          value: selected.contains(item),
+          onChanged: (value) {
+            setState(() {
+              if (value == true) {
+                selected.add(item);
+              } else {
+                selected.remove(item);
+              }
+            });
+          },
+          activeColor: ThemeConfig.primaryColor,
+        );
+      }).toList(),
+    );
   }
 }

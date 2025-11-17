@@ -10,7 +10,6 @@ import '../widgets/recommended_meal_card.dart';
 import '../../config/theme_config.dart';
 import 'meal_record_screen.dart';
 
-/// 首页界面
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
 
@@ -22,7 +21,6 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    // ⭐ 不在这里调用 initialize，因为已经在 AppInitializerPage 中调用过了
   }
 
   @override
@@ -49,25 +47,20 @@ class _HomeScreenState extends State<HomeScreen> {
                   children: [
                     _buildGreeting(viewModel),
 
-                    // 用户信息不完整提示
-                    if (!viewModel.isUserProfileComplete())
+                    if (!viewModel.hasFilledAnyInfo())
                       _buildProfileIncompleteBanner(viewModel),
 
-                    // ⭐ AI推荐区域（5套方案）
                     _buildRecommendationsSection(viewModel),
 
-                    // LQI卡片
                     if (viewModel.todayLQI != null)
                       LQISimpleCard(
                         lqi: viewModel.todayLQI!,
                         onTap: () {
-                          // TODO: 跳转到LQI详情页
                         },
                       ),
 
                     const SizedBox(height: 8),
 
-                    // 今日餐食
                     _buildTodayMeals(viewModel),
 
                     const SizedBox(height: 80),
@@ -94,7 +87,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  /// 构建AppBar
   Widget _buildAppBar() {
     return SliverAppBar(
       expandedHeight: 120,
@@ -139,7 +131,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  /// 构建问候语
   Widget _buildGreeting(HomeViewModel viewModel) {
     final now = DateTime.now();
     String greeting = '早上好';
@@ -178,7 +169,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  /// 构建用户信息不完整提示横幅
   Widget _buildProfileIncompleteBanner(HomeViewModel viewModel) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -197,7 +187,7 @@ class _HomeScreenState extends State<HomeScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '⚠️ 您的个人信息或饮食偏好不完整',
+                  '⚠️ 完善个人信息，获得精准推荐',
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
@@ -206,7 +196,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '当前推荐基于大众口味，完善信息后可获得更精准的个性化推荐',
+                  '当前推荐基于大众口味，完善信息后可获得更个性化的餐食方案',
                   style: TextStyle(
                     fontSize: 12,
                     color: Colors.orange[700],
@@ -226,9 +216,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  /// ⭐ 构建AI推荐区域（5套方案）
   Widget _buildRecommendationsSection(HomeViewModel viewModel) {
-    // 如果正在加载且没有缓存
     if (viewModel.isLoadingRecommendations && !viewModel.hasRecommendations) {
       return Container(
         margin: const EdgeInsets.all(16),
@@ -274,7 +262,6 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
 
-    // 如果没有推荐
     if (!viewModel.hasRecommendations) {
       return Container(
         margin: const EdgeInsets.all(16),
@@ -309,7 +296,6 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
 
-    // 显示推荐
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -340,7 +326,6 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               Row(
                 children: [
-                  // ⭐ 换一套按钮
                   TextButton.icon(
                     onPressed: viewModel.isLoadingRecommendations
                         ? null
@@ -354,7 +339,6 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  // ⭐ 重新生成按钮
                   IconButton(
                     onPressed: viewModel.isLoadingRecommendations
                         ? null
@@ -379,11 +363,12 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
 
-        // ⭐ 推荐餐食卡片（当前套餐的3个餐食）
+        _buildRecommendationContext(viewModel),
+
         ...viewModel.currentRecommendations.map(
           (recommendation) => RecommendedMealCard(
             meal: recommendation,
-            showModelBadge: false, // 不显示模型标签（只用GPT-3.5）
+            showModelBadge: false,
             onAdopt: () async {
               await viewModel.adoptRecommendation(recommendation);
               if (mounted) {
@@ -393,12 +378,10 @@ class _HomeScreenState extends State<HomeScreen> {
               }
             },
             onViewDetail: () {
-              // TODO: 查看推荐详情
             },
           ),
         ),
 
-        // ⭐ 套餐指示器（显示当前是第几套）
         if (viewModel.totalSets > 1)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -424,7 +407,68 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  /// 构建今日餐食
+  Widget _buildRecommendationContext(HomeViewModel viewModel) {
+    final user = viewModel.currentUser;
+    if (user == null) return const SizedBox.shrink();
+
+    final healthGoal = user.healthGoal;
+    final mealSource = _getMealSourceText(user.defaultMealSource);
+    final city = user.city ?? '未知城市';
+
+    String contextText = '根据您的【$healthGoal】目标、【$mealSource】偏好';
+    if (user.city != null && user.city!.isNotEmpty) {
+      contextText += '、【$city】消费水平';
+    }
+    contextText += '，为您推荐以下餐食';
+
+    final shouldShowSnack = _shouldRecommendSnack(healthGoal);
+    if (shouldShowSnack) {
+      contextText += '及零食';
+    }
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.green[50],
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.green[200]!),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.lightbulb_outline, color: Colors.green[700], size: 20),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              contextText,
+              style: TextStyle(
+                fontSize: 13,
+                color: Colors.green[900],
+                height: 1.4,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  bool _shouldRecommendSnack(String healthGoal) {
+    final noSnackGoals = ['减脂', '清汤寡欲'];
+    return !noSnackGoals.contains(healthGoal);
+  }
+
+  String _getMealSourceText(int level) {
+    const texts = {
+      1: '基本外食',
+      2: '较多外食',
+      3: '外食与自制各半',
+      4: '较多自己做',
+      5: '基本自己做',
+    };
+    return texts[level] ?? '未设置';
+  }
+
   Widget _buildTodayMeals(HomeViewModel viewModel) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -459,7 +503,6 @@ class _HomeScreenState extends State<HomeScreen> {
           ...viewModel.todayMeals.map((meal) => MealCard(
             meal: meal,
             onTap: () {
-              // TODO: 查看餐食详情
             },
             onDelete: () async {
               final confirmed = await _showDeleteConfirmDialog(meal.name);
@@ -475,7 +518,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  /// 构建空状态
   Widget _buildEmptyState() {
     return Center(
       child: Padding(
@@ -509,7 +551,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  /// 显示日期选择器
   Future<void> _showDatePicker() async {
     final viewModel = context.read<HomeViewModel>();
 
@@ -526,7 +567,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  /// 显示删除确认对话框
   Future<bool?> _showDeleteConfirmDialog(String mealName) {
     return showDialog<bool>(
       context: context,
@@ -548,7 +588,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  /// ⭐ 显示重新生成确认对话框
   Future<bool?> _showRefreshConfirmDialog() {
     return showDialog<bool>(
       context: context,
@@ -569,7 +608,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  /// 获取激励消息
   String _getMotivationalMessage(HomeViewModel viewModel) {
     if (viewModel.todayMeals.isEmpty) {
       return '今天还没有记录餐食，开始记录吧！';

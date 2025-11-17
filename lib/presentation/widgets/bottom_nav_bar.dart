@@ -2,18 +2,13 @@
 // Dart类文件
 
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../config/theme_config.dart';
-import '../screens/home_screen.dart';
-import '../screens/statistics_screen.dart';
-import '../screens/profile_screen.dart';
-import '../screens/settings_screen.dart';
+import '../viewmodels/user_viewmodel.dart';
 
-/// 底部导航栏组件
-///
-/// 用于应用主页面的底部导航
 class BottomNavBar extends StatelessWidget {
   final int currentIndex;
-  final ValueChanged<int> onTap;
+  final Function(int) onTap;
 
   const BottomNavBar({
     Key? key,
@@ -23,76 +18,88 @@ class BottomNavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BottomNavigationBar(
-      currentIndex: currentIndex,
-      onTap: onTap,
-      type: BottomNavigationBarType.fixed,
-      selectedItemColor: ThemeConfig.primaryColor,
-      unselectedItemColor: Colors.grey,
-      selectedFontSize: 12,
-      unselectedFontSize: 12,
-      items: const [
-        BottomNavigationBarItem(
-          icon: Icon(Icons.home),
-          activeIcon: Icon(Icons.home, size: 28),
-          label: '首页',
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.bar_chart),
-          activeIcon: Icon(Icons.bar_chart, size: 28),
-          label: '统计',
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.person),
-          activeIcon: Icon(Icons.person, size: 28),
-          label: '我的',
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.settings),
-          activeIcon: Icon(Icons.settings, size: 28),
-          label: '设置',
-        ),
-      ],
+    return Container(
+      decoration: BoxDecoration(
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 8,
+            offset: const Offset(0, -2),
+          ),
+        ],
+      ),
+      child: BottomNavigationBar(
+        currentIndex: currentIndex,
+        onTap: onTap,
+        type: BottomNavigationBarType.fixed,
+        selectedItemColor: ThemeConfig.primaryColor,
+        unselectedItemColor: Colors.grey,
+        selectedFontSize: 12,
+        unselectedFontSize: 12,
+        items: [
+          const BottomNavigationBarItem(
+            icon: Icon(Icons.home),
+            label: '首页',
+          ),
+          const BottomNavigationBarItem(
+            icon: Icon(Icons.restaurant),
+            label: '记录',
+          ),
+          const BottomNavigationBarItem(
+            icon: Icon(Icons.analytics),
+            label: '分析',
+          ),
+          BottomNavigationBarItem(
+            icon: _buildProfileIcon(context),
+            label: '我的',
+          ),
+        ],
+      ),
     );
   }
-}
 
-/// 主页面导航容器
-///
-/// 包含底部导航栏和页面切换逻辑
-class MainNavigationScreen extends StatefulWidget {
-  const MainNavigationScreen({Key? key}) : super(key: key);
+  Widget _buildProfileIcon(BuildContext context) {
+    return Consumer<UserViewModel>(
+      builder: (context, userViewModel, child) {
+        final shouldShowRedDot = _shouldShowRedDot(userViewModel);
 
-  @override
-  State<MainNavigationScreen> createState() => _MainNavigationScreenState();
-}
-
-class _MainNavigationScreenState extends State<MainNavigationScreen> {
-  int _currentIndex = 0;
-
-  // 页面列表 - 使用真实页面
-  final List<Widget> _pages = [
-    const HomeScreen(),         // 首页
-    const StatisticsScreen(),   // 统计
-    const ProfileScreen(),      // 我的
-    const SettingsScreen(),     // 设置
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: IndexedStack(
-        index: _currentIndex,
-        children: _pages,
-      ),
-      bottomNavigationBar: BottomNavBar(
-        currentIndex: _currentIndex,
-        onTap: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
-        },
-      ),
+        return Stack(
+          clipBehavior: Clip.none,
+          children: [
+            const Icon(Icons.person),
+            if (shouldShowRedDot)
+              Positioned(
+                right: -2,
+                top: -2,
+                child: Container(
+                  width: 8,
+                  height: 8,
+                  decoration: const BoxDecoration(
+                    color: Colors.red,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
     );
+  }
+
+  bool _shouldShowRedDot(UserViewModel userViewModel) {
+    final user = userViewModel.currentUser;
+    if (user == null) return false;
+
+    final hasFilledAny = userViewModel.hasFilledAnyInfo();
+
+    final isComplete = user.age != null &&
+        user.height != null &&
+        user.weight != null &&
+        user.gender != null &&
+        (user.city != null && user.city!.isNotEmpty) &&
+        user.preferredCuisines.isNotEmpty &&
+        user.healthConditions.isNotEmpty;
+
+    return hasFilledAny && !isComplete;
   }
 }

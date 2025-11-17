@@ -8,68 +8,49 @@ import '../logic/preference_logic.dart';
 import '../logic/avoidance_logic.dart';
 import '../logic/special_diet_logic.dart';
 
-/// 每日推荐AI提示词构建器
-///
-/// 根据用户当天输入的餐食来源和就餐形式构建AI提示词
 class DailyPromptBuilder {
-  // ==================== 核心构建方法 ====================
-
-  /// 构建完整的每日推荐提示词
   static String build({
     required UserProfile user,
-    required int dailyMealSource, // 用户当天输入的餐食来源(1-5)
-    required String dailyDiningStyle, // 用户当天输入的就餐形式
-    String? specificCuisine, // 指定今日菜系（可选）
+    required int dailyMealSource,
+    required String dailyDiningStyle,
+    String? specificCuisine,
   }) {
     StringBuffer prompt = StringBuffer();
 
-    // 1. 系统角色和任务说明
     prompt.writeln(_buildSystemRole());
     prompt.writeln();
 
-    // 2. 用户基础信息
     prompt.writeln(_buildUserInfo(user));
     prompt.writeln();
 
-    // 3. 今日餐食来源
     prompt.writeln(_buildMealSourceInfo(dailyMealSource, user.isVIPValid));
     prompt.writeln();
 
-    // 4. 今日就餐形式
     prompt.writeln(_buildDiningStyleInfo(dailyDiningStyle));
     prompt.writeln();
 
-    // 5. 菜系偏好和今日菜系
     prompt.writeln(_buildCuisineInfo(user, specificCuisine));
     prompt.writeln();
 
-    // 6. 忌口清单
     prompt.writeln(_buildAvoidanceInfo(user));
     prompt.writeln();
 
-    // 7. 特殊饮食需求
     if (user.isVegetarian || user.hasHighBloodSugar) {
       prompt.writeln(_buildSpecialDietInfo(user));
       prompt.writeln();
     }
 
-    // 8. 零食建议
     prompt.writeln(_buildSnackInfo(user));
     prompt.writeln();
 
-    // 9. 营养目标
     prompt.writeln(_buildNutritionTargets(user));
     prompt.writeln();
 
-    // 10. 输出格式要求
     prompt.writeln(_buildOutputFormat(user.isVIPValid));
 
     return prompt.toString();
   }
 
-  // ==================== 各部分构建 ====================
-
-  /// 构建系统角色
   static String _buildSystemRole() {
     return '''
 你是一位专业的营养师和健康饮食顾问，擅长根据用户的需求推荐个性化的餐食方案。
@@ -77,7 +58,6 @@ class DailyPromptBuilder {
 ''';
   }
 
-  /// 构建用户基础信息
   static String _buildUserInfo(UserProfile user) {
     return '''
 === 用户基础信息 ===
@@ -90,7 +70,6 @@ ${user.bmi != null ? 'BMI: ${user.bmi!.toStringAsFixed(1)} (${user.bmiRating})' 
 ''';
   }
 
-  /// 构建餐食来源信息
   static String _buildMealSourceInfo(int mealSource, bool isVIP) {
     return '''
 === 今日餐食来源 ===
@@ -114,7 +93,6 @@ ${isVIP ? '''
 ''';
   }
 
-  /// 构建就餐形式信息
   static String _buildDiningStyleInfo(String diningStyle) {
     return '''
 === 今日就餐形式 ===
@@ -122,7 +100,6 @@ ${DiningStyleLogic.getFullPromptForDiningStyle(diningStyle)}
 ''';
   }
 
-  /// 构建菜系信息
   static String _buildCuisineInfo(UserProfile user, String? specificCuisine) {
     String todayCuisine = specificCuisine ??
                          (user.preferredCuisines.isNotEmpty
@@ -135,7 +112,6 @@ ${PreferenceLogic.getFullCuisinePrompt(user.preferredCuisines, todayCuisine)}
 ''';
   }
 
-  /// 构建忌口信息
   static String _buildAvoidanceInfo(UserProfile user) {
     return '''
 === 忌口清单 ===
@@ -148,7 +124,6 @@ ${AvoidanceLogic.getFullAvoidancePrompt(
 ''';
   }
 
-  /// 构建特殊饮食信息
   static String _buildSpecialDietInfo(UserProfile user) {
     return SpecialDietLogic.getFullSpecialDietPrompt(
       isVegetarian: user.isVegetarian,
@@ -156,7 +131,6 @@ ${AvoidanceLogic.getFullAvoidancePrompt(
     );
   }
 
-  /// 构建零食信息
   static String _buildSnackInfo(UserProfile user) {
     return '''
 === 零食建议 ===
@@ -164,16 +138,29 @@ ${PreferenceLogic.getSnackPromptDescription(user.snackFrequency)}
 ''';
   }
 
-  /// 构建营养目标
   static String _buildNutritionTargets(UserProfile user) {
+    final targetCalories = _getTargetCalories(user.healthGoal);
+    final targetProtein = _getTargetProtein(user.healthGoal);
+    final targetCarbs = _getTargetCarbs(user.healthGoal);
+    final targetFat = _getTargetFat(user.healthGoal);
+
     return '''
 === 营养目标 ===
-每日目标热量：约${_getTargetCalories(user.healthGoal)} kcal
-每日目标蛋白质：约${_getTargetProtein(user.healthGoal)} g
-每日目标碳水：约${_getTargetCarbs(user.healthGoal)} g
-每日目标脂肪：约${_getTargetFat(user.healthGoal)} g
 
-请确保三餐的营养分配合理：
+⚠️ 重要提示：以下目标值仅供参考，请根据用户的实际身体状况（年龄、性别、身高、体重、BMI）进行智能调整。
+
+参考目标（基于健康目标"${user.healthGoal}"）：
+- 每日参考热量：约$targetCalories kcal
+- 每日参考蛋白质：约$targetProtein g
+- 每日参考碳水：约$targetCarbs g
+- 每日参考脂肪：约$targetFat g
+
+请根据用户的具体情况智能调整：
+1. 如果用户BMI偏高且健康目标是"增肌"或"胡吃海塞"，请适当降低热量，并温和提醒
+2. 如果用户BMI偏低且健康目标是"减脂"或"清汤寡欲"，请适当提高热量，并温和提醒
+3. 如果用户身体状况与健康目标不匹配，请在推荐中给出合理建议
+
+三餐营养分配建议：
 - 早餐：25-30%的日总热量
 - 午餐：35-40%的日总热量
 - 晚餐：30-35%的日总热量
@@ -186,7 +173,6 @@ ${PreferenceLogic.getSnackPromptDescription(user.snackFrequency)}
 ''';
   }
 
-  /// 构建输出格式
   static String _buildOutputFormat(bool isVIP) {
     return '''
 === 输出格式要求 ===
@@ -228,19 +214,17 @@ ${PreferenceLogic.getSnackPromptDescription(user.snackFrequency)}
   },
   "lunch": { ... },
   "dinner": { ... },
-  "snack": { ... } // 如果需要零食建议
+  "snack": { ... }
 }
 
 请确保：
 1. 所有推荐的食材都不在忌口列表中
 2. 符合用户的菜系偏好和今日指定菜系
-3. 营养成分准确、合理
+3. 营养成分根据用户实际情况智能调整
 4. 情绪调节营养素含量充足
 5. ${isVIP ? '提供详细的菜谱步骤' : '不提供菜谱步骤'}
 ''';
   }
-
-  // ==================== 辅助方法 ====================
 
   static int _getTargetCalories(String healthGoal) {
     const targets = {
@@ -248,6 +232,8 @@ ${PreferenceLogic.getSnackPromptDescription(user.snackFrequency)}
       '增肌': 2500,
       '维持': 2000,
       '随意': 2000,
+      '胡吃海塞': 3000,
+      '清汤寡欲': 1500,
     };
     return targets[healthGoal] ?? 2000;
   }
@@ -258,6 +244,8 @@ ${PreferenceLogic.getSnackPromptDescription(user.snackFrequency)}
       '增肌': 150,
       '维持': 100,
       '随意': 100,
+      '胡吃海塞': 120,
+      '清汤寡欲': 80,
     };
     return targets[healthGoal] ?? 100;
   }
@@ -268,6 +256,8 @@ ${PreferenceLogic.getSnackPromptDescription(user.snackFrequency)}
       '增肌': 300,
       '维持': 250,
       '随意': 250,
+      '胡吃海塞': 400,
+      '清汤寡欲': 150,
     };
     return targets[healthGoal] ?? 250;
   }
@@ -278,6 +268,8 @@ ${PreferenceLogic.getSnackPromptDescription(user.snackFrequency)}
       '增肌': 80,
       '维持': 70,
       '随意': 70,
+      '胡吃海塞': 100,
+      '清汤寡欲': 40,
     };
     return targets[healthGoal] ?? 70;
   }
