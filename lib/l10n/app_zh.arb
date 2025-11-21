@@ -115,5 +115,17 @@
   "success": "成功",
   "@success": {
     "description": "成功提示"
+  },
+  "healthyEatingMode": "健康饮食模式",
+  "@healthyEatingMode": {
+    "description": "健康饮食模式标题"
+  },
+  "healthyEatingModeOn": "推荐兼顾健康与美味",
+  "@healthyEatingModeOn": {
+    "description": "健康饮食模式开启时的描述"
+  },
+  "healthyEatingModeOff": "推荐注重口味享受",
+  "@healthyEatingModeOff": {
+    "description": "健康饮食模式关闭时的描述"
   }
 }

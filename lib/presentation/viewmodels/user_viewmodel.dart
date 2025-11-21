@@ -87,6 +87,36 @@ class UserViewModel extends ChangeNotifier {
     }
   }
 
+  Future<bool> updateHealthyEatingMode(bool isHealthy) async {
+    try {
+      final success = await _userRepository.updateHealthyEatingMode(isHealthy);
+
+      if (success) {
+        await loadUser();
+      }
+
+      return success;
+    } catch (e) {
+      _setError('更新健康饮食模式失败: $e');
+      return false;
+    }
+  }
+
+  Future<bool> updateHealthConditions(List<String> conditions) async {
+    try {
+      final success = await _userRepository.updateHealthConditions(conditions);
+
+      if (success) {
+        await loadUser();
+      }
+
+      return success;
+    } catch (e) {
+      _setError('更新健康状况失败: $e');
+      return false;
+    }
+  }
+
   Future<bool> updateDefaultMealSource(int mealSource) async {
     try {
       final success = await _userRepository.updateDefaultMealSource(mealSource);
@@ -233,21 +263,6 @@ class UserViewModel extends ChangeNotifier {
       return success;
     } catch (e) {
       _setError('更新血糖状态失败: $e');
-      return false;
-    }
-  }
-
-  Future<bool> updateHealthConditions(List<String> conditions) async {
-    try {
-      final success = await _userRepository.updateHealthConditions(conditions);
-
-      if (success) {
-        await loadUser();
-      }
-
-      return success;
-    } catch (e) {
-      _setError('更新健康状况失败: $e');
       return false;
     }
   }

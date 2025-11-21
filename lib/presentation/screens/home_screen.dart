@@ -4,6 +4,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../viewmodels/home_viewmodel.dart';
+import '../viewmodels/user_viewmodel.dart';
 import '../widgets/meal_card.dart';
 import '../widgets/lqi_card.dart';
 import '../widgets/recommended_meal_card.dart';
@@ -46,6 +47,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _buildGreeting(viewModel),
+
+                    _buildHealthyEatingSwitch(viewModel),
 
                     if (!viewModel.hasFilledAnyInfo())
                       _buildProfileIncompleteBanner(viewModel),
@@ -163,6 +166,64 @@ class _HomeScreenState extends State<HomeScreen> {
               fontSize: 14,
               color: Colors.black54,
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHealthyEatingSwitch(HomeViewModel viewModel) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: ThemeConfig.cardShadow,
+      ),
+      child: Row(
+        children: [
+          Icon(
+            viewModel.currentUser?.isHealthyEatingMode == true
+                ? Icons.favorite
+                : Icons.restaurant,
+            color: ThemeConfig.primaryColor,
+            size: 28,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  '健康饮食模式',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  viewModel.currentUser?.isHealthyEatingMode == true
+                      ? '推荐兼顾健康与美味'
+                      : '推荐注重口味享受',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Colors.black54,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Switch(
+            value: viewModel.currentUser?.isHealthyEatingMode ?? false,
+            onChanged: (value) async {
+              await context.read<UserViewModel>().updateHealthyEatingMode(value);
+              if (mounted) {
+                await viewModel.refreshRecommendations();
+              }
+            },
+            activeColor: ThemeConfig.primaryColor,
           ),
         ],
       ),
@@ -411,19 +472,21 @@ class _HomeScreenState extends State<HomeScreen> {
     final user = viewModel.currentUser;
     if (user == null) return const SizedBox.shrink();
 
-    final healthGoal = user.healthGoal;
-    final mealSource = _getMealSourceText(user.defaultMealSource);
-    final city = user.city ?? '未知城市';
+    String contextText;
 
-    String contextText = '根据您的【$healthGoal】目标、【$mealSource】偏好';
-    if (user.city != null && user.city!.isNotEmpty) {
-      contextText += '、【$city】消费水平';
-    }
-    contextText += '，为您推荐以下餐食';
+    if (user.isHealthyEatingMode) {
+      final healthGoal = user.healthGoal;
+      final mealSource = _getMealSourceText(user.defaultMealSource);
+      final city = user.city ?? '未知城市';
 
-    final shouldShowSnack = _shouldRecommendSnack(healthGoal);
-    if (shouldShowSnack) {
-      contextText += '及零食';
+      contextText = '根据您的【$healthGoal】目标、【$mealSource】偏好';
+      if (user.city != null && user.city!.isNotEmpty) {
+        contextText += '、【$city】消费水平';
+      }
+      contextText += '，为您推荐营养均衡的餐食';
+    } else {
+      final mealSource = _getMealSourceText(user.defaultMealSource);
+      contextText = '根据您的【$mealSource】偏好和口味喜好，为您推荐美味餐食';
     }
 
     return Container(
@@ -451,11 +514,6 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
     );
-  }
-
-  bool _shouldRecommendSnack(String healthGoal) {
-    final noSnackGoals = ['减脂', '清汤寡欲'];
-    return !noSnackGoals.contains(healthGoal);
   }
 
   String _getMealSourceText(int level) {

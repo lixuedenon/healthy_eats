@@ -17,6 +17,18 @@ class UserProfile {
 
   final String healthGoal; // 减脂/增肌/维持/随意
 
+  // ==================== 健康饮食模式 ====================
+
+  /// 健康饮食模式开关
+  /// true: 兼顾健康与美味，AI会考虑BMI、健康目标、健康状况
+  /// false: 优先美味，AI只考虑口味偏好，不考虑健康因素
+  final bool isHealthyEatingMode;
+
+  // ==================== 健康状况 ====================
+
+  /// 健康状况列表（可多选）
+  final List<String> healthConditions;
+
   // ==================== 餐食来源 ====================
 
   /// 默认餐食来源级别（1-5）
@@ -92,6 +104,8 @@ class UserProfile {
     this.weight,
     this.gender,
     this.healthGoal = '维持',
+    this.isHealthyEatingMode = false,
+    this.healthConditions = const [],
     this.defaultMealSource = 3,
     this.defaultDiningStyle = '主要自己吃',
     this.preferredCuisines = const ['中餐'],
@@ -134,6 +148,10 @@ class UserProfile {
       weight: json['weight'] as double?,
       gender: json['gender'] as String?,
       healthGoal: json['healthGoal'] as String? ?? '维持',
+      isHealthyEatingMode: json['isHealthyEatingMode'] as bool? ?? false,
+      healthConditions: (json['healthConditions'] as List<dynamic>?)
+          ?.map((e) => e as String)
+          .toList() ?? [],
       defaultMealSource: json['defaultMealSource'] as int? ?? 3,
       defaultDiningStyle: json['defaultDiningStyle'] as String? ?? '主要自己吃',
       preferredCuisines: (json['preferredCuisines'] as List<dynamic>?)
@@ -187,6 +205,8 @@ class UserProfile {
       'weight': weight,
       'gender': gender,
       'healthGoal': healthGoal,
+      'isHealthyEatingMode': isHealthyEatingMode,
+      'healthConditions': healthConditions,
       'defaultMealSource': defaultMealSource,
       'defaultDiningStyle': defaultDiningStyle,
       'preferredCuisines': preferredCuisines,
@@ -229,6 +249,8 @@ class UserProfile {
     double? weight,
     String? gender,
     String? healthGoal,
+    bool? isHealthyEatingMode,
+    List<String>? healthConditions,
     int? defaultMealSource,
     String? defaultDiningStyle,
     List<String>? preferredCuisines,
@@ -266,6 +288,8 @@ class UserProfile {
       weight: weight ?? this.weight,
       gender: gender ?? this.gender,
       healthGoal: healthGoal ?? this.healthGoal,
+      isHealthyEatingMode: isHealthyEatingMode ?? this.isHealthyEatingMode,
+      healthConditions: healthConditions ?? this.healthConditions,
       defaultMealSource: defaultMealSource ?? this.defaultMealSource,
       defaultDiningStyle: defaultDiningStyle ?? this.defaultDiningStyle,
       preferredCuisines: preferredCuisines ?? this.preferredCuisines,
@@ -330,5 +354,26 @@ class UserProfile {
     if (bmiValue < 24) return '正常';
     if (bmiValue < 28) return '偏胖';
     return '肥胖';
+  }
+
+  /// 判断是否有任何健康问题（除了"无"之外）
+  bool get hasAnyHealthCondition {
+    return healthConditions.isNotEmpty &&
+           healthConditions.any((condition) => condition != '无');
+  }
+
+  /// 获取健康状况的显示文本
+  String getHealthConditionsDisplay() {
+    if (healthConditions.isEmpty ||
+        (healthConditions.length == 1 && healthConditions.first == '无')) {
+      return '无';
+    }
+
+    final conditions = healthConditions.where((c) => c != '无').toList();
+    if (conditions.isEmpty) {
+      return '无';
+    }
+
+    return conditions.join('、');
   }
 }

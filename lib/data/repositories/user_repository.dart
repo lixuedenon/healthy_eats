@@ -107,6 +107,32 @@ class UserRepository {
     return await saveUser(updatedUser);
   }
 
+  /// 更新健康饮食模式
+  Future<bool> updateHealthyEatingMode(bool isHealthy) async {
+    final user = await getUser();
+    if (user == null) return false;
+
+    final updatedUser = user.copyWith(
+      isHealthyEatingMode: isHealthy,
+      updatedAt: DateTime.now(),
+    );
+
+    return await saveUser(updatedUser);
+  }
+
+  /// 更新健康状况
+  Future<bool> updateHealthConditions(List<String> conditions) async {
+    final user = await getUser();
+    if (user == null) return false;
+
+    final updatedUser = user.copyWith(
+      healthConditions: conditions,
+      updatedAt: DateTime.now(),
+    );
+
+    return await saveUser(updatedUser);
+  }
+
   // ==================== 餐食偏好更新 ====================
 
   /// 更新默认餐食来源
