@@ -30,6 +30,7 @@ class _HomeScreenState extends State<HomeScreen> {
       backgroundColor: Colors.grey[50],
       body: CustomScrollView(
         slivers: [
+          // ✅ 修改1：压缩 AppBar 高度
           _buildAppBar(),
           SliverToBoxAdapter(
             child: Consumer<HomeViewModel>(
@@ -46,9 +47,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildGreeting(viewModel),
+                    // ✅ 修改2：合并问候语和开关，开关放右侧
+                    _buildGreetingWithSwitch(viewModel),
 
-                    _buildHealthyEatingSwitch(viewModel),
+                    // ✅ 删除：原来独立的健康饮食开关卡片已移除
 
                     if (!viewModel.hasFilledAnyInfo())
                       _buildProfileIncompleteBanner(viewModel),
@@ -90,9 +92,10 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  // ✅ 修改1：压缩 AppBar 高度（从 120 → 80）
   Widget _buildAppBar() {
     return SliverAppBar(
-      expandedHeight: 120,
+      expandedHeight: 80, // ✅ 从 120 改为 80
       floating: false,
       pinned: true,
       backgroundColor: ThemeConfig.primaryColor,
@@ -100,7 +103,7 @@ class _HomeScreenState extends State<HomeScreen> {
         title: const Text(
           'Healthy Eats',
           style: TextStyle(
-            fontSize: 20,
+            fontSize: 18, // ✅ 从 20 改为 18
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -134,7 +137,8 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildGreeting(HomeViewModel viewModel) {
+  // ✅ 修改2：合并问候语和模式切换按钮（新方法）
+  Widget _buildGreetingWithSwitch(HomeViewModel homeViewModel) {
     final now = DateTime.now();
     String greeting = '早上好';
     String emoji = '🌅';
@@ -147,88 +151,206 @@ class _HomeScreenState extends State<HomeScreen> {
       emoji = '🌙';
     }
 
-    return Padding(
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            ThemeConfig.primaryColor,
+            ThemeConfig.primaryColor.withOpacity(0.85),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: ThemeConfig.primaryColor.withOpacity(0.3),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // 问候语部分
           Text(
-            '$emoji $greeting，${viewModel.currentUser?.name ?? ''}',
+            '$emoji $greeting，${homeViewModel.currentUser?.name ?? '用户'}',
             style: const TextStyle(
-              fontSize: 24,
+              fontSize: 20,
               fontWeight: FontWeight.bold,
+              color: Colors.white,
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           Text(
-            _getMotivationalMessage(viewModel),
+            _getMotivationalMessage(homeViewModel),
             style: const TextStyle(
-              fontSize: 14,
-              color: Colors.black54,
+              fontSize: 13,
+              color: Colors.white70,
             ),
+          ),
+
+          const SizedBox(height: 12),
+
+          // ✅ 模式切换按钮
+          Consumer<UserViewModel>(
+            builder: (context, userViewModel, child) {
+              final isHealthyMode = userViewModel.currentUser?.isHealthyEatingMode ?? false;
+
+              return Row(
+                children: [
+                  const Text(
+                    '📍 推荐模式：',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.white70,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+
+                  // 美味优先按钮
+                  _buildModeButton(
+                    label: '美味优先',
+                    icon: Icons.restaurant,
+                    isActive: !isHealthyMode,
+                    onTap: () => _onModeChanged(context, false, userViewModel, homeViewModel),
+                  ),
+
+                  const SizedBox(width: 8),
+
+                  // 健康优先按钮
+                  _buildModeButton(
+                    label: '健康优先',
+                    icon: Icons.favorite,
+                    isActive: isHealthyMode,
+                    onTap: () => _onModeChanged(context, true, userViewModel, homeViewModel),
+                  ),
+                ],
+              );
+            },
           ),
         ],
       ),
     );
   }
 
-  Widget _buildHealthyEatingSwitch(HomeViewModel viewModel) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: ThemeConfig.cardShadow,
-      ),
-      child: Row(
-        children: [
-          Icon(
-            viewModel.currentUser?.isHealthyEatingMode == true
-                ? Icons.favorite
-                : Icons.restaurant,
-            color: ThemeConfig.primaryColor,
-            size: 28,
+  // ✅ 构建模式按钮
+  Widget _buildModeButton({
+    required String label,
+    required IconData icon,
+    required bool isActive,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: isActive ? null : onTap, // 已激活的按钮不可点击
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: isActive ? Colors.white : Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isActive ? Colors.white : Colors.white.withOpacity(0.5),
+            width: 1.5,
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  '健康饮食模式',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  viewModel.currentUser?.isHealthyEatingMode == true
-                      ? '推荐兼顾健康与美味'
-                      : '推荐注重口味享受',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: Colors.black54,
-                  ),
-                ),
-              ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 14,
+              color: isActive ? ThemeConfig.primaryColor : Colors.white.withOpacity(0.7),
             ),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+                color: isActive ? ThemeConfig.primaryColor : Colors.white.withOpacity(0.7),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ✅ 处理模式切换
+  Future<void> _onModeChanged(
+    BuildContext context,
+    bool newMode,
+    UserViewModel userViewModel,
+    HomeViewModel homeViewModel,
+  ) async {
+    // 先更新状态（开关立即改变）
+    await userViewModel.updateHealthyEatingMode(newMode);
+
+    // 弹出确认对话框
+    if (!mounted) return;
+
+    final confirmed = await _showModeChangeConfirmDialog(newMode);
+
+    if (confirmed == true) {
+      // 用户选择"是" → 刷新推荐
+      if (mounted) {
+        await homeViewModel.refreshRecommendations();
+      }
+    } else {
+      // 用户选择"否" → 回退状态
+      await userViewModel.updateHealthyEatingMode(!newMode);
+    }
+  }
+
+  // ✅ 模式切换确认对话框
+  Future<bool?> _showModeChangeConfirmDialog(bool isHealthyMode) {
+    final String modeText = isHealthyMode ? '健康优先' : '美味优先（不考虑是否为健康饮食）';
+    final String description = isHealthyMode
+        ? '将根据您的健康目标、BMI 和健康状况推荐餐食'
+        : '将主要考虑口味偏好，不特别考虑健康因素';
+
+    return showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('切换推荐模式'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('是否按【$modeText】标准重新生成推荐？'),
+            const SizedBox(height: 8),
+            Text(
+              description,
+              style: TextStyle(
+                fontSize: 13,
+                color: Colors.grey[600],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('取消'),
           ),
-          Switch(
-            value: viewModel.currentUser?.isHealthyEatingMode ?? false,
-            onChanged: (value) async {
-              await context.read<UserViewModel>().updateHealthyEatingMode(value);
-              if (mounted) {
-                await viewModel.refreshRecommendations();
-              }
-            },
-            activeColor: ThemeConfig.primaryColor,
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: ThemeConfig.primaryColor,
+            ),
+            child: const Text('确定'),
           ),
         ],
       ),
     );
   }
+
+  // ✅ 删除：原来的 _buildGreeting 方法已被 _buildGreetingWithSwitch 替代
+  // ✅ 删除：原来的 _buildHealthyEatingSwitch 方法已被合并到 _buildGreetingWithSwitch
 
   Widget _buildProfileIncompleteBanner(HomeViewModel viewModel) {
     return Container(

@@ -155,18 +155,22 @@ class AIRecommendationService {
 ''';
   }
 
-  /// 美味优先Prompt（不勾选健康饮食）
+  /// ✅ 修改后的美味优先Prompt（不勾选健康饮食）
   String _getTastyPrompt(UserProfile user, int setsCount) {
     final mealSourceText = _getMealSourceText(user.defaultMealSource);
+    final mealSourceLevel = user.defaultMealSource;
     final avoidFoods = user.getAllAvoidFoods();
     final snackText = _getSnackRecommendationText(user.snackFrequency);
+
+    // ✅ 根据餐食来源决定推荐方式
+    final isMainlyEatingOut = mealSourceLevel <= 2; // 基本外食或较多外食
 
     return '''
 请为以下用户推荐${setsCount}套不同的今日餐食方案：
 
 【用户信息】
 - 年龄：${user.age ?? '未知'}岁，性别：${user.gender ?? '未知'}
-${user.city != null && user.city!.isNotEmpty ? '- 城市：${user.city}' : ''}
+${user.city != null && user.city!.isNotEmpty ? '- 城市：${user.city}（请推荐真实存在的当地餐馆）' : ''}
 - 餐食来源：$mealSourceText
 - 菜系偏好：${user.preferredCuisines.join('、')}
 - 就餐方式：${user.defaultDiningStyle}
@@ -174,10 +178,16 @@ ${avoidFoods.isNotEmpty ? '- 忌口：${avoidFoods.join('、')}' : ''}
 ${user.isVegetarian ? '- 素食者' : ''}
 
 【推荐要求】
-✅ 优先考虑美味和满足感
-✅ 推荐真实餐馆菜品（如果是外食），价格符合当地消费水平
-✅ 菜品要接地气、好吃（如：Tacos, Burgers, 麻辣烫, 鱼香肉丝, Sushi, Ramen）
-✅ 不必考虑健康和营养比例
+✅ 优先考虑美味和满足感，不必考虑健康和营养比例
+${isMainlyEatingOut ? '''✅ 用户主要外食，请推荐真实餐馆的菜品
+✅ 菜品格式：【餐馆名】菜品名（如：【Din Tai Fung】小笼包、【In-N-Out】Double-Double汉堡）
+✅ 推荐接地气、美味的餐馆菜品（如：烤肉、拉面、披萨、炸鸡、火锅、寿司）
+✅ 价格符合${user.city ?? '当地'}的消费水平
+❌ 不要推荐食材清单和烹饪步骤
+❌ ingredients 字段留空数组 []
+❌ cookingTime 设为 null''' : '''✅ 用户主要自己做，推荐简单美味的家常菜
+✅ 提供食材清单和简单的烹饪建议
+✅ 烹饪时间不超过30分钟'''}
 ${avoidFoods.isNotEmpty ? '✅ 严格避开忌口食材' : ''}
 
 【零食推荐】
@@ -191,9 +201,9 @@ $snackText
       "meals": [
         {
           "mealType": "早餐",
-          "name": "餐食名称",
-          "description": "简短描述",
-          "ingredients": ["食材1 50g", "食材2 100ml"],
+          "name": "${isMainlyEatingOut ? '【餐馆名】菜品名' : '餐食名称'}",
+          "description": "简短描述${isMainlyEatingOut ? '（强调美味）' : ''}",
+          "ingredients": ${isMainlyEatingOut ? '[]' : '["食材1 50g", "食材2 100ml"]'},
           "nutrition": {
             "calories": 500,
             "protein": 20,
@@ -206,8 +216,8 @@ $snackText
             "omega3": 0.2
           },
           "estimatedROI": 85,
-          "cookingTips": "烹饪建议或餐厅建议",
-          "cookingTime": 20
+          "cookingTips": "${isMainlyEatingOut ? '推荐餐馆地址或备注' : '烹饪建议'}",
+          "cookingTime": ${isMainlyEatingOut ? 'null' : '20'}
         },
         {
           "mealType": "午餐",
@@ -237,8 +247,11 @@ $snackText
     final bmiInfo = _getBMIInfo(user);
     final healthConditionsText = _getHealthConditionsText(user);
     final mealSourceText = _getMealSourceText(user.defaultMealSource);
+    final mealSourceLevel = user.defaultMealSource;
     final avoidFoods = user.getAllAvoidFoods();
     final snackText = _getHealthySnackRecommendationText(user.healthGoal, user.snackFrequency);
+
+    final isMainlyEatingOut = mealSourceLevel <= 2;
 
     return '''
 请为以下用户推荐${setsCount}套不同的今日餐食方案：
@@ -259,7 +272,7 @@ ${user.isVegetarian ? '- 素食者' : ''}
 ✅ 兼顾健康与美味
 ✅ 根据BMI和健康目标调整热量和营养比例
 ${healthConditionsText.isNotEmpty ? '✅ 考虑健康状况，避开相应的禁忌食物' : ''}
-✅ 推荐真实餐馆菜品或简单家常菜，价格符合当地消费水平
+${isMainlyEatingOut ? '✅ 推荐真实餐馆的健康菜品，价格符合当地消费水平' : '✅ 推荐简单健康的家常菜'}
 ${avoidFoods.isNotEmpty ? '✅ 严格避开忌口食材' : ''}
 
 【零食推荐】
@@ -360,16 +373,16 @@ $snackText
     }
   }
 
-  /// 获取零食推荐文本（健康饮食模式）
+  /// ✅ 修改后的零食推荐文本（健康饮食模式）
   String _getHealthySnackRecommendationText(String healthGoal, String snackFrequency) {
-    final noSnackGoals = ['减脂', '清汤寡欲'];
+    // ✅ 更新：删除"清汤寡欲"，保留"减脂"
+    final noSnackGoals = ['减脂'];
     final shouldRecommendByGoal = !noSnackGoals.contains(healthGoal);
     final shouldRecommendByFrequency = !['不吃零食', '很少吃'].contains(snackFrequency);
 
     if (shouldRecommendByGoal && shouldRecommendByFrequency) {
-      if (healthGoal == '胡吃海塞') {
-        return '用户零食偏好：${snackFrequency}，推荐零食（各类美味零食均可）';
-      } else if (healthGoal == '增肌') {
+      // ✅ 新增：增肌和增肥都推荐高蛋白零食
+      if (healthGoal == '增肌' || healthGoal == '增肥') {
         return '用户零食偏好：${snackFrequency}，推荐零食（高蛋白零食，如蛋白棒、坚果、酸奶）';
       } else {
         return '用户零食偏好：${snackFrequency}，推荐零食（健康零食，如坚果、水果、酸奶）';
